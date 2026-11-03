@@ -29,6 +29,7 @@ It also checks this repo's releases. If there's a newer one with a file for that
 2. Then either:
    - open **Actions > Release > Run workflow**, or
    - create a release on GitHub (**Releases > Draft a new release**) with a version tag such as `v1.3.0` and publish it.
+   - for a release that already exists without files: open it, click **Edit**, then **Update release** (works from a phone; GitHub's phone website hides the Run workflow button).
 
    Either way, GitHub builds the Windows and Mac apps and attaches them to the release. If a release for that version already exists without files, Run workflow fills it in, along with a title and notes if they're missing.
 
