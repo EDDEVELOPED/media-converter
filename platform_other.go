@@ -64,3 +64,6 @@ func openBrowser(url string) {
 func fatal(msg string) { log.Print(msg) }
 
 func detach(cmd *exec.Cmd) { cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true} }
+
+// focusAppWindow is only needed on Windows.
+func focusAppWindow() bool { return false }

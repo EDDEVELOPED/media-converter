@@ -100,6 +100,8 @@ run("trim 0:02-0:05 armenian name", ["Սարքավորում test.mov"], {"forma
 run("audio-only file to mp4 fails", ["voicemail.wav"], {"format": "mp4"}, expect="failed")
 run("no-sound video to mp3 fails", ["odd size no audio.mp4"], {"format": "mp3"}, expect="failed")
 run("not a video", ["notes.mp4"], {"format": "mp4"}, expect="invalid")
+st = run("empty .dav (0 bytes)", ["empty-export.dav"], {"format": "mp4"}, expect="invalid")
+print(f"{'PASS' if 'empty (0 bytes)' in st['jobs'][0]['error'] else 'FAIL'}  empty file explains itself")
 # Same name again: must not overwrite, should become "(converted)"
 run("name clash", ["Shop walkaround.mov"], {"format": "mp4"})
 

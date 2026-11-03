@@ -308,6 +308,16 @@ func (a *App) addPaths(paths []string, uploaded bool) int {
 		}
 		a.nextID++
 		j := &Job{ID: a.nextID, Path: p, Name: filepath.Base(p), Size: st.Size(), Uploaded: uploaded, Status: "probing"}
+		if st.Size() == 0 {
+			// Nothing to read: usually a copy or export from a recorder that didn't finish.
+			j.Status = "invalid"
+			j.Error = "This file is empty (0 bytes), so there's nothing to convert. The copy or export didn't finish. Copy it again from the recorder, USB drive or app it came from."
+			a.jobs = append(a.jobs, j)
+			a.notify()
+			a.mu.Unlock()
+			added++
+			continue
+		}
 		if !a.ff.Found {
 			if a.checking {
 				j.Status = "probing"

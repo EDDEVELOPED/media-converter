@@ -114,19 +114,40 @@ func powershell(script string) (string, error) {
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass",
 		"-EncodedCommand", base64.StdEncoding.EncodeToString(b))
 	hideWindow(cmd)
-	var stderr strings.Builder
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	allowForeground()
+	if err := cmd.Start(); err != nil {
+		return "", errors.New("The file picker didn't open: " + err.Error())
+	}
+	stop := make(chan struct{})
+	go focusDialogOf(cmd.Process.Pid, stop)
+	err := cmd.Wait()
+	close(stop)
+	go focusAppWindow() // back to Media Converter once the picker closes
 	if err != nil {
 		return "", errors.New("The file picker didn't open: " + strings.TrimSpace(stderr.String()))
 	}
-	return strings.TrimPrefix(string(out), "\ufeff"), nil
+	return strings.TrimPrefix(stdout.String(), "\ufeff"), nil
 }
 
+// The dialogs are owned by an invisible, always-on-top window so they open
+// above everything. If any of that setup fails, the dialog still opens.
 const dialogPrelude = `Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $owner = New-Object System.Windows.Forms.Form
-$owner.TopMost = $true
+try {
+  $owner.TopMost = $true
+  $owner.ShowInTaskbar = $false
+  $owner.FormBorderStyle = 'None'
+  $owner.Opacity = 0
+  $owner.StartPosition = 'CenterScreen'
+  $owner.Size = New-Object System.Drawing.Size(1, 1)
+  $owner.Show()
+  $owner.Activate()
+} catch {}
 `
 
 // All files comes first so nothing FFmpeg could read is ever hidden.
@@ -189,6 +210,9 @@ $owner.Dispose()
 }
 
 func reveal(path string) error {
+	before := explorerWindows()
+	allowForeground()
+	defer func() { go focusExplorerFor(filepath.Dir(path), before) }()
 	cmd := exec.Command("explorer.exe")
 	// explorer needs /select,"path" exactly; set the raw command line.
 	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `explorer.exe /select,"` + path + `"`}
@@ -202,6 +226,9 @@ func reveal(path string) error {
 // openBrowser opens the interface in its own app-style window (Chrome or
 // Edge, which every Windows PC has), falling back to the default browser.
 func openBrowser(url string) {
+	before := appWindows()
+	allowForeground()
+	defer focusAppWindowSoon(before)
 	var cands []string
 	for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"} {
 		if base := os.Getenv(env); base != "" {
@@ -236,7 +263,7 @@ func fatal(msg string) {
 	mb := syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW")
 	t, _ := syscall.UTF16PtrFromString(appName)
 	m, _ := syscall.UTF16PtrFromString(msg)
-	mb.Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x10)
+	mb.Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x10|0x10000|0x40000) // error icon, foreground, topmost
 }
 
 // detach starts the restarted app as its own process, not tied to this one.

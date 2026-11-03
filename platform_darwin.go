@@ -127,3 +127,6 @@ func fatal(msg string) {
 
 // detach lets the restarted app outlive this process.
 func detach(cmd *exec.Cmd) { cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true} }
+
+// focusAppWindow is only needed on Windows.
+func focusAppWindow() bool { return false }

@@ -77,7 +77,9 @@ func main() {
 				if len(openFiles) > 0 {
 					forwardFiles(info, openFiles)
 				}
-				openBrowser(url)
+				if !focusAppWindow() { // its window was closed: open a new one
+					openBrowser(url)
+				}
 				return
 			}
 			ln, err = net.Listen("tcp", "127.0.0.1:0")
