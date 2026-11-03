@@ -603,7 +603,7 @@ func platformAsset() string {
 func (a *App) checkAppUpdate(ctx context.Context) (bool, error) {
 	api := os.Getenv("MC_UPDATE_API")
 	if api == "" {
-		api = "https://api.github.com/repos/" + updateRepo + "/releases/latest"
+		api = "https://api.github.com/repos/" + updateRepo + "/releases?per_page=20"
 	}
 	req, _ := http.NewRequestWithContext(ctx, "GET", api, nil)
 	req.Header.Set("User-Agent", userAgent())
@@ -619,7 +619,7 @@ func (a *App) checkAppUpdate(ctx context.Context) (bool, error) {
 	if resp.StatusCode != 200 {
 		return false, fmt.Errorf("update server answered %s", resp.Status)
 	}
-	var rel struct {
+	type release struct {
 		Tag    string `json:"tag_name"`
 		Body   string `json:"body"`
 		Page   string `json:"html_url"`
@@ -631,26 +631,48 @@ func (a *App) checkAppUpdate(ctx context.Context) (bool, error) {
 			Size int64  `json:"size"`
 		} `json:"assets"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	if err != nil {
 		return false, err
 	}
-	ver := strings.TrimPrefix(rel.Tag, "v")
-	if rel.Draft || rel.Pre || !newerVersion(ver, appVersion) {
-		return false, nil
+	var rels []release
+	if t := strings.TrimSpace(string(data)); strings.HasPrefix(t, "[") {
+		err = json.Unmarshal(data, &rels)
+	} else {
+		var one release
+		err = json.Unmarshal(data, &one)
+		rels = []release{one}
 	}
+	if err != nil {
+		return false, err
+	}
+	// Take the newest release that actually has this computer's file and the
+	// checksums; a release made on GitHub before its files were attached is skipped.
 	want := platformAsset()
-	var assetURL, sumsURL string
+	var rel release
+	var ver, assetURL, sumsURL string
 	var size int64
-	for _, as := range rel.Assets {
-		switch as.Name {
-		case want:
-			assetURL, size = as.URL, as.Size
-		case "checksums.txt":
-			sumsURL = as.URL
+	for _, r := range rels {
+		v := strings.TrimPrefix(r.Tag, "v")
+		if r.Draft || r.Pre || !newerVersion(v, appVersion) || (ver != "" && !newerVersion(v, ver)) {
+			continue
+		}
+		var a, c string
+		var sz int64
+		for _, as := range r.Assets {
+			switch as.Name {
+			case want:
+				a, sz = as.URL, as.Size
+			case "checksums.txt":
+				c = as.URL
+			}
+		}
+		if a != "" && c != "" {
+			rel, ver, assetURL, sumsURL, size = r, v, a, c, sz
 		}
 	}
-	if assetURL == "" || sumsURL == "" {
-		return false, nil // this release has nothing for this computer
+	if ver == "" {
+		return false, nil
 	}
 	sha, err := fetchSHA(ctx, sumsURL, want)
 	if err != nil {

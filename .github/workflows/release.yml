@@ -1,41 +1,115 @@
-# Builds the Windows and Mac apps and publishes them as a GitHub release.
-# Run it from the Actions tab (Release > Run workflow) after changing VERSION
-# and release-notes.md. Installed copies offer the update the next time they open.
+# Builds the Windows and Mac apps and attaches them to a GitHub release.
+#
+# To publish a new version, change VERSION and release-notes.md, push, then either:
+#   - Actions > Release > Run workflow. This creates release vX.Y.Z, or fills in
+#     a release for that version that was made on GitHub without files.
+#   - Releases > Draft a new release, tag it with the version (for example
+#     v1.3.0) and publish it. This workflow then builds and attaches the files.
+# Installed copies offer the update the next time they open.
+#
+# Re-running an old run rebuilds that old version, which is already published,
+# so it stops without changing anything. Use Run workflow instead.
 name: Release
 
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
+  release:
+    types: [published]
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Choose the release
+        id: pick
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEW=""
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            TAG="$EVENT_TAG"   # a release someone just published on GitHub
+          else
+            V="$(cat VERSION)"
+            TAG=""
+            for t in "v$V" "$V"; do
+              if gh release view "$t" >/dev/null 2>&1; then TAG="$t"; break; fi
+            done
+            if [ -z "$TAG" ]; then TAG="v$V"; NEW=1; fi
+          fi
+          VERSION="${TAG#v}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+            echo "::error::The release tag '$TAG' must be a version number like v1.3.0, or the app can't compare versions."
+            exit 1
+          fi
+          SKIP=""
+          if [ -z "$NEW" ]; then
+            FILES="$(gh release view "$TAG" --json assets --jq '.assets | length')"
+            if [ "$FILES" -gt 0 ]; then
+              if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+                echo "::notice::$TAG already has files attached, so nothing was built."
+                SKIP=1
+              else
+                echo "::error::$TAG is already published with its files. To publish a new version, change VERSION (and release-notes.md), push, then click Run workflow."
+                exit 1
+              fi
+            else
+              git checkout -q "refs/tags/$TAG"   # build exactly the code the release points to
+            fi
+          fi
+          if [ -z "$SKIP" ]; then
+            [ "$(cat VERSION 2>/dev/null)" = "$VERSION" ] || echo "::warning::VERSION says $(cat VERSION 2>/dev/null), but the release is $TAG. Building it as $VERSION."
+            echo "Publishing $TAG (version $VERSION) from commit $(git rev-parse --short HEAD)"
+          fi
+          { echo "tag=$TAG"; echo "version=$VERSION"; echo "new=$NEW"; echo "skip=$SKIP"; } >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-go@v5
+        if: steps.pick.outputs.skip != '1'
         with:
           go-version: "1.24"
           cache: false # no third-party modules to cache
 
       - name: Build
+        if: steps.pick.outputs.skip != '1'
+        env:
+          VERSION: ${{ steps.pick.outputs.version }}
         run: ./build.sh
 
       - name: Publish
+        if: steps.pick.outputs.skip != '1'
         env:
-          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.pick.outputs.tag }}
+          VERSION: ${{ steps.pick.outputs.version }}
+          NEW: ${{ steps.pick.outputs.new }}
+        shell: bash
         run: |
-          VERSION="$(cat VERSION)"
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            echo "::error::v$VERSION is already published. Change VERSION (and release-notes.md) to publish a new release."
-            exit 1
+          set -euo pipefail
+          FILES=(dist/MediaConverter-Windows.zip dist/MediaConverter-Mac.zip dist/MediaConverter-windows-amd64.exe dist/MediaConverter-macos-universal dist/checksums.txt)
+          if [ -n "$NEW" ]; then
+            gh release create "$TAG" --target "$(git rev-parse HEAD)" --title "Media Converter $VERSION" --notes-file release-notes.md "${FILES[@]}"
+          else
+            gh release upload "$TAG" "${FILES[@]}" --clobber
+            # A release made on GitHub may have no title or notes yet.
+            if [ -z "$(gh release view "$TAG" --json body --jq .body)" ] && [ -f release-notes.md ]; then
+              gh release edit "$TAG" --notes-file release-notes.md
+            fi
+            if [ -z "$(gh release view "$TAG" --json name --jq .name)" ]; then
+              gh release edit "$TAG" --title "Media Converter $VERSION"
+            fi
           fi
-          gh release create "v$VERSION" --target "$GITHUB_SHA" \
-            --title "Media Converter $VERSION" --notes-file release-notes.md \
-            dist/MediaConverter-Windows.zip dist/MediaConverter-Mac.zip \
-            dist/MediaConverter-windows-amd64.exe dist/MediaConverter-macos-universal \
-            dist/checksums.txt
+          echo "Published $TAG. Installed copies will offer Media Converter $VERSION the next time they open."
