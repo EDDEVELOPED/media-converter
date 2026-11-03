@@ -1,0 +1,46 @@
+# Media Converter
+
+A small desktop app for converting video and audio with FFmpeg. It runs on Windows and Mac with no Python or other runtime: it's a single Go program that shows its interface in an app-style browser window and runs FFmpeg on your computer.
+
+## Download
+- **Windows:** [MediaConverter-Windows.zip](https://github.com/EDDEVELOPED/media-converter/releases/latest/download/MediaConverter-Windows.zip)
+- **Mac** (Apple Silicon and Intel): [MediaConverter-Mac.zip](https://github.com/EDDEVELOPED/media-converter/releases/latest/download/MediaConverter-Mac.zip)
+
+Each zip has a "Read me first" file with the one-time steps for opening an app that isn't from a known publisher. After that, the app installs FFmpeg for you and keeps itself up to date.
+
+## Formats
+Video: MP4 (H.264), MP4 (HEVC), WebM (VP9), MOV, MKV, GIF
+Audio: MP3, M4A (AAC), WAV, FLAC, OGG (Opus)
+
+Options: quality (including "Original", a fast copy with no re-encoding for MP4/MOV/MKV), video size (1080p/720p/480p, never upscales, works with portrait phone video), remove sound, trim start/end per file, save next to the original or in another folder. Existing files are never overwritten.
+
+## FFmpeg and updates
+If FFmpeg isn't installed, the **Install FFmpeg** button downloads an official static build (gyan.dev on Windows, with BtbN as a backup; Martin Riedl's builds on Apple Silicon Macs, evermeet.cx on Intel Macs), checks its SHA-256 where the site publishes one, and keeps it in the app's own settings folder. When the app opens it checks that source for a newer FFmpeg (only for the copy it installed; Homebrew or winget copies are left to those tools).
+
+It also checks the latest release of this repo (`EDDEVELOPED/media-converter`). If it's newer, the app offers to update, downloads the right file, checks it against `checksums.txt`, makes sure it runs, swaps it in and restarts. The open window reconnects to the new version by itself.
+
+## Publishing a new version
+1. Change `VERSION` (for example to `1.2.0`) and write what's new in `release-notes.md`.
+2. Run `./release.sh`. It builds everything and creates the GitHub release with these files:
+   - `MediaConverter-Windows.zip`, `MediaConverter-Mac.zip`: downloads for new users
+   - `MediaConverter-windows-amd64.exe`, `MediaConverter-macos-universal`: what the app downloads to update itself
+   - `checksums.txt`: SHA-256 of each file, which the app checks
+Release tags must look like `v1.2.0`. Drafts and pre-releases are ignored by the updater.
+
+## Files
+- `main.go` startup, single-instance check, local server
+- `app.go` file queue, conversion runner, HTTP API
+- `ffmpeg.go` formats, finding FFmpeg, reading files, building FFmpeg commands
+- `updates.go` one-click FFmpeg install, FFmpeg updates, app self-update
+- `platform_*.go` file pickers, Show in Finder/Explorer, opening the window (per OS)
+- `ui/index.html` the whole interface (embedded into the program)
+- `packaging/` icons, Mac Info.plist, read-me files
+- `build.sh` builds `dist/MediaConverter-Windows.zip` and `dist/MediaConverter-Mac.zip`
+
+## Tests
+`tests/run_tests.py` converts sample files to every format through the app's API; `tests/update_tests.py` runs the FFmpeg install and update flows and the app self-update against local stand-in servers; `tests/shots.py` takes screenshots of the interface. They need Python 3, Playwright and FFmpeg, and a Linux build of the app (`go build -o /tmp/mc-linux .`).
+
+## Building
+Needs Go 1.24+ and Python 3. Run `./build.sh` (output in `dist/`). To add a format, add it to the `formats` list and to `buildArgs` in `ffmpeg.go`.
+
+Settings and a log file are kept in `%AppData%\MediaConverter` (Windows) or `~/Library/Application Support/MediaConverter` (Mac).

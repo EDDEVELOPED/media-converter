@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Media Converter</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23F5C518'/%3E%3Cpath d='M8 9.5v13l9-6.5z' fill='%2318212B'/%3E%3Crect x='19' y='12' width='2.6' height='8' rx='1.3' fill='%2318212B'/%3E%3Crect x='23.4' y='9' width='2.6' height='14' rx='1.3' fill='%2318212B'/%3E%3C/svg%3E">
+<style>
+:root {
+  --paper: #E8EBEE;
+  --panel: #FFFFFF;
+  --ink: #18212B;
+  --ink-2: #5B6674;
+  --ink-3: #8C96A2;
+  --line: #D5DAE0;
+  --line-2: #E6E9ED;
+  --signal: #F5C518;
+  --signal-hover: #E6B60B;
+  --fill: #FBEDB0;
+  --ok: #1F7A4A;
+  --ok-tint: #DDF0E5;
+  --bad: #B23A24;
+  --bad-tint: #F7E1DC;
+  --warn: #8A5A00;
+  --focus: #2F6FDE;
+  --radius-lg: 12px;
+  --radius: 8px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #171C22;
+    --panel: #20272F;
+    --ink: #E9EDF1;
+    --ink-2: #A4AEBA;
+    --ink-3: #75808C;
+    --line: #333D48;
+    --line-2: #2A323C;
+    --fill: rgba(245, 197, 24, .17);
+    --ok: #5CC48A;
+    --ok-tint: rgba(92, 196, 138, .16);
+    --bad: #F08A73;
+    --bad-tint: rgba(240, 138, 115, .15);
+    --warn: #E8B84A;
+    --focus: #7AA7FF;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* ---------- header ---------- */
+.top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px 10px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { width: 28px; height: 28px; display: block; }
+.brand h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+.top-right { display: flex; align-items: center; gap: 10px; }
+.ff-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; color: var(--ink-2);
+  padding: 4px 10px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line);
+}
+.ff-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+.ff-pill.ok i { background: var(--ok); }
+.ff-pill.bad i { background: var(--bad); }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 13px;
+  border-radius: var(--radius); border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink);
+  font-size: 13px; font-weight: 550; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: var(--ink-3); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn.ghost:hover { color: var(--ink); background: var(--line-2); }
+.btn.small { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.btn.icon { width: 28px; padding: 0; }
+.btn.primary { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+.linkish { border: 0; background: none; padding: 0; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-weight: 600; }
+
+/* ---------- layout ---------- */
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 344px;
+  gap: 16px;
+  padding: 6px 24px 24px;
+}
+.queue, .panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  min-height: 0;
+}
+.queue { display: flex; flex-direction: column; overflow: hidden; }
+.queue-bar {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--line-2);
+}
+.queue-bar h2 { margin: 0; font-size: 14px; font-weight: 650; }
+.queue-actions { display: flex; gap: 6px; }
+.scroll { flex: 1; overflow: auto; min-height: 0; }
+
+/* ---------- empty state ---------- */
+.drop {
+  margin: 16px; min-height: calc(100% - 32px);
+  display: grid; place-items: center; text-align: center;
+  border: 1.5px dashed var(--line); border-radius: 10px; padding: 40px 24px;
+  color: var(--ink-2);
+}
+.drop svg { width: 56px; height: 56px; margin-bottom: 14px; color: var(--ink-3); }
+.drop-title { margin: 0 0 4px; font-size: 17px; font-weight: 650; color: var(--ink); }
+.drop-sub { margin: 0; }
+.drop-note { margin: 18px 0 0; font-size: 12.5px; color: var(--ink-3); max-width: 46ch; }
+
+/* ---------- FFmpeg setup ---------- */
+.setup { margin: 16px; padding: 18px 20px; border-radius: 10px; background: var(--paper); }
+.setup h2 { margin: 0 0 6px; font-size: 16px; }
+.setup p { margin: 0 0 12px; color: var(--ink-2); max-width: 64ch; }
+.setup ol { margin: 0 0 16px; padding-left: 20px; }
+.setup li { margin: 6px 0; padding-left: 4px; }
+.setup .muted-note { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.cmd {
+  display: inline-flex; align-items: center; gap: 0; margin: 6px 0 2px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden;
+}
+.cmd code { padding: 6px 12px; font: 13px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; user-select: all; }
+.cmd button { height: 32px; border: 0; border-left: 1px solid var(--line); background: transparent; padding: 0 12px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
+.cmd button:hover { background: var(--line-2); }
+.setup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.setup a { color: var(--ink); }
+
+.install-box { margin: 4px 0 16px; }
+.btn.install { height: 40px; padding: 0 18px; font-size: 14px; }
+.install-box .hint { margin-top: 8px; max-width: 60ch; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--signal); border-radius: 3px; transition: width .3s linear; }
+.bar.busy i { width: 35%; animation: slide 1.1s ease-in-out infinite alternate; }
+@keyframes slide { from { margin-left: 0; } to { margin-left: 65%; } }
+.progress-row { display: flex; align-items: center; gap: 12px; max-width: 460px; }
+.progress-row .bar { flex: 1; }
+.progress-text { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.setup details { margin-top: 4px; }
+.setup summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-bottom: 10px; }
+.setup summary:hover { color: var(--ink); }
+
+/* ---------- update banners ---------- */
+.banners { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 0 24px 8px; }
+.banners:empty { display: none; }
+.banner {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 12px 10px 16px; border-radius: 10px; background: var(--panel);
+  border: 1px solid var(--line); box-shadow: inset 4px 0 0 var(--signal);
+}
+.banner .text { flex: 1; min-width: 220px; font-size: 13px; }
+.banner .text b { font-weight: 650; }
+.banner .notes { display: block; color: var(--ink-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70ch; }
+.banner .btns { display: flex; gap: 6px; }
+.banner .bar { width: 180px; }
+.banner.error { box-shadow: inset 4px 0 0 var(--bad); }
+
+/* ---------- file rows ---------- */
+.list { list-style: none; margin: 0; padding: 0; }
+.job {
+  position: relative;
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 14px; align-items: start;
+  padding: 13px 14px 13px 18px; border-bottom: 1px solid var(--line-2);
+}
+.job > * { position: relative; }
+.job .fill {
+  position: absolute; inset: 0 auto 0 0; width: 0;
+  background: var(--fill); pointer-events: none;
+  transition: width .5s linear;
+}
+.job.running .fill { width: var(--p, 0%); }
+.kind {
+  width: 36px; height: 36px; border-radius: var(--radius);
+  display: grid; place-items: center; background: var(--paper); color: var(--ink-2);
+}
+.kind svg { width: 18px; height: 18px; }
+.job.done .kind { background: var(--ok-tint); color: var(--ok); }
+.job.failed .kind, .job.invalid .kind { background: var(--bad-tint); color: var(--bad); }
+.job.running .kind { background: var(--signal); color: #18212B; }
+.name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta, .status { display: flex; flex-wrap: wrap; column-gap: 14px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.meta { color: var(--ink-2); }
+.status { margin-top: 3px; color: var(--ink-2); }
+.status b { color: var(--ink); font-weight: 650; }
+.ok { color: var(--ok); }
+.bad { color: var(--bad); }
+.warn { color: var(--warn); }
+.acts { display: flex; gap: 4px; align-items: center; padding-top: 3px; }
+.trim { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 8px 0 2px; font-size: 12.5px; color: var(--ink-2); }
+.trim label { display: inline-flex; align-items: center; gap: 6px; }
+.trim input {
+  width: 84px; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); font-variant-numeric: tabular-nums;
+}
+.trim input[aria-invalid="true"] { border-color: var(--bad); }
+.detail {
+  margin: 8px 0 0; padding: 10px 12px; max-height: 160px; overflow: auto;
+  background: var(--paper); border-radius: 6px; font: 11.5px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink-2);
+}
+.job.pending .kind svg { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+
+/* ---------- settings panel ---------- */
+.panel { display: flex; flex-direction: column; overflow: hidden; }
+.panel-body { flex: 1; min-height: 0; overflow: auto; padding: 18px 18px 6px; }
+.panel h2 { margin: 0 0 12px; font-size: 14px; font-weight: 650; }
+fieldset { border: 0; margin: 0 0 12px; padding: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 6px; font-size: 12.5px; color: var(--ink-2); }
+.fmt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tile { position: relative; }
+.tile input, .seg input { position: absolute; opacity: 0; pointer-events: none; }
+.tile span {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  height: 34px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--radius);
+  font-weight: 600; font-size: 13px; cursor: pointer; line-height: 1.15;
+}
+.tile:hover span { border-color: var(--ink-3); }
+.tile input:checked + span { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+.tile input:focus-visible + span, .seg input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tile input:disabled + span { opacity: .4; cursor: not-allowed; }
+.fmt-desc { margin: 0 0 16px; font-size: 13px; color: var(--ink-2); min-height: 38px; }
+.field { margin-bottom: 14px; }
+.field-label { display: block; margin-bottom: 6px; font-size: 12.5px; color: var(--ink-2); }
+.seg { display: flex; padding: 3px; gap: 2px; background: var(--paper); border-radius: 9px; }
+.seg label { flex: 1; position: relative; }
+.seg span {
+  display: block; text-align: center; padding: 6px 4px; border-radius: 6px;
+  font-size: 13px; font-weight: 550; color: var(--ink-2); cursor: pointer; white-space: nowrap;
+}
+.seg input:checked + span { background: var(--panel); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+.seg input:disabled + span { cursor: default; }
+.hint { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.check { display: flex; align-items: center; gap: 8px; margin: -2px 0 16px; font-size: 13px; cursor: pointer; }
+.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--ink); }
+.path-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12.5px; color: var(--ink-2); }
+.path-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.go { flex: none; padding: 12px 18px 14px; border-top: 1px solid var(--line-2); }
+.convert {
+  width: 100%; height: 48px; border: 0; border-radius: 10px;
+  background: var(--signal); color: #18212B;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.convert:hover { background: var(--signal-hover); }
+.convert:disabled { background: var(--line-2); color: var(--ink-3); cursor: default; }
+.convert.stop { background: transparent; color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad); }
+.convert.stop:hover { background: var(--bad-tint); }
+.go .hint { text-align: center; min-height: 18px; margin-top: 7px; }
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--paper) 70%, transparent); backdrop-filter: blur(3px);
+}
+.overlay .card {
+  padding: 28px 40px; border-radius: 14px; background: var(--panel);
+  border: 2px dashed var(--ink-3); font-size: 17px; font-weight: 650; text-align: center;
+}
+.overlay .card p { margin: 6px 0 0; font-size: 13px; font-weight: 400; color: var(--ink-2); }
+.closed .card { border-style: solid; border-width: 1px; border-color: var(--line); max-width: 380px; }
+.closed .card .btn { margin-top: 16px; }
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 20;
+  max-width: min(560px, calc(100% - 32px)); padding: 10px 16px; border-radius: 10px;
+  background: var(--ink); color: var(--panel); font-size: 13px;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.toast.show { opacity: 1; }
+
+@media (max-width: 820px) {
+  .banners { padding: 0 16px 8px; }
+  html, body { height: auto; }
+  body { overflow: auto; min-height: 100%; }
+  .layout { grid-template-columns: 1fr; }
+  .panel, .panel-body { overflow: visible; }
+  .queue { min-height: 320px; }
+  .top { padding: 12px 16px 8px; }
+  .layout { padding: 4px 16px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar.busy i { animation: none; width: 100%; opacity: .5; }
+  .job .fill { transition: none; }
+  .job.pending .kind svg { animation: none; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#F5C518"/><path d="M8 9.5v13l9-6.5z" fill="#18212B"/><rect x="19" y="12" width="2.6" height="8" rx="1.3" fill="#18212B"/><rect x="23.4" y="9" width="2.6" height="14" rx="1.3" fill="#18212B"/></svg>
+    <h1>Media Converter</h1>
+  </div>
+  <div class="top-right">
+    <span id="ffPill" class="ff-pill"><i></i><span>Looking for FFmpeg…</span></span>
+    <button id="versionBtn" class="btn ghost small" type="button" title="Check for updates">Version</button>
+    <button id="quitBtn" class="btn ghost small" type="button">Quit</button>
+  </div>
+</header>
+
+<div id="banners" class="banners" aria-live="polite"></div>
+
+<main class="layout">
+  <section class="queue" aria-labelledby="filesTitle">
+    <div class="queue-bar">
+      <h2 id="filesTitle">Files</h2>
+      <div class="queue-actions">
+        <button id="clearBtn" class="btn ghost small" type="button" hidden>Clear finished</button>
+        <button id="addBtn" class="btn small" type="button">Add files</button>
+      </div>
+    </div>
+    <div class="scroll" id="scroll">
+      <section id="setup" class="setup" hidden aria-labelledby="setupTitle">
+        <h2 id="setupTitle">Set up FFmpeg</h2>
+        <p>Media Converter uses the free FFmpeg program to do the converting, and it isn't on this computer yet. You only need to install it once.</p>
+        <div class="install-box" id="installBox">
+          <div id="installIdle">
+            <button id="ffInstall" class="btn primary install" type="button">Install FFmpeg</button>
+            <p class="hint" id="installNote"></p>
+            <p class="bad" id="installError" hidden></p>
+          </div>
+          <div id="installBusy" hidden>
+            <div class="progress-row"><div class="bar" id="installBar"><i></i></div><button id="installCancel" class="btn ghost small" type="button">Cancel</button></div>
+            <p class="progress-text" id="installText"></p>
+          </div>
+        </div>
+        <details id="manualSetup">
+          <summary>Install it myself instead</summary>
+          <ol id="setupSteps"></ol>
+          <div class="setup-actions">
+            <button id="ffCheck" class="btn" type="button">Check again</button>
+            <button id="ffLocate" class="btn" type="button">Locate FFmpeg…</button>
+          </div>
+        </details>
+      </section>
+      <div id="empty" class="drop">
+        <div>
+          <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="14" width="32" height="24" rx="4"/><path d="M38 23l11-6v18l-11-6"/><path d="M22 20v12M17 27l5 5 5-5"/></svg>
+          <p class="drop-title">Drop videos or audio here</p>
+          <p class="drop-sub">or <button class="linkish" id="addBtn2" type="button">choose files</button> from your computer</p>
+          <p class="drop-note">Converted files are saved next to the originals unless you pick another folder. Originals are never changed.</p>
+        </div>
+      </div>
+      <ul id="list" class="list"></ul>
+      <ul id="pendingList" class="list"></ul>
+    </div>
+  </section>
+
+  <aside class="panel" aria-labelledby="convertTitle">
+    <div class="panel-body">
+    <h2 id="convertTitle">Convert to</h2>
+    <fieldset><legend>Video</legend><div class="fmt-grid" id="fmtVideo"></div></fieldset>
+    <fieldset><legend>Audio only</legend><div class="fmt-grid" id="fmtAudio"></div></fieldset>
+    <p id="fmtDesc" class="fmt-desc"></p>
+
+    <div class="field" id="qualityField">
+      <span class="field-label" id="qualityLabel">Quality</span>
+      <div class="seg" id="quality" role="radiogroup" aria-labelledby="qualityLabel"></div>
+      <p class="hint" id="qualityHint"></p>
+    </div>
+    <div class="field" id="resField">
+      <span class="field-label" id="resLabel">Video size</span>
+      <div class="seg" id="resolution" role="radiogroup" aria-labelledby="resLabel"></div>
+      <p class="hint" id="resHint"></p>
+    </div>
+    <label class="check" id="audioField"><input type="checkbox" id="removeAudio"> Remove the sound</label>
+    <div class="field">
+      <span class="field-label" id="saveLabel">Save to</span>
+      <div class="seg" id="saveMode" role="radiogroup" aria-labelledby="saveLabel"></div>
+      <div class="path-row" id="pathRow" hidden><span id="outDir"></span><button class="btn ghost small" id="changeDir" type="button">Change…</button></div>
+      <p class="hint" id="saveHint" hidden></p>
+    </div>
+    </div>
+
+    <div class="go">
+      <button id="convertBtn" class="convert" type="button" disabled>Convert</button>
+      <p id="goHint" class="hint"></p>
+    </div>
+  </aside>
+</main>
+
+<div id="dropOverlay" class="overlay" hidden><div class="card">Drop to add files<p>Videos and audio files are copied in, then converted.</p></div></div>
+<div id="closed" class="overlay closed" hidden><div class="card"><span id="closedTitle">Media Converter is closed</span><p id="closedText">Open the app again to convert more files.</p><button class="btn" type="button" id="reconnect">Reconnect</button></div></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const TOKEN = params.get('t') || sessionStorage.getItem('mc-token') || '';
+if (params.get('t')) sessionStorage.setItem('mc-token', params.get('t'));
+
+const ICON = {
+  video: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="2.5" y="4.5" width="11" height="11" rx="2"/><path d="M13.5 8.5l4-2.5v8l-4-2.5"/></svg>',
+  audio: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 8.5v3M6.5 5.5v9M10 3v14M13.5 6.5v7M17 9v2"/></svg>',
+  done: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>',
+  bad: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 5v6.5M10 14.6v.1"/></svg>',
+  file: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M5 2.5h6.5l3.5 3.5v11.5H5z"/><path d="M11.5 2.5V6H15"/></svg>',
+  x: '<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg>',
+};
+
+let S = null;
+let pageVersion = null;
+let restarting = false;
+const dismissed = new Set(JSON.parse(sessionStorage.getItem('mc-dismissed') || '[]'));
+const dismiss = (key) => { dismissed.add(key); sessionStorage.setItem('mc-dismissed', JSON.stringify([...dismissed])); render(); };
+const rows = new Map();
+const openTrim = new Set();
+const openDetail = new Set();
+let pending = [];
+
+// ---------- helpers ----------
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function fmtDur(s) {
+  if (!(s > 0)) return '';
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`;
+}
+function fmtSize(b) {
+  if (!(b >= 0)) return '';
+  if (b < 1000) return b + ' B';
+  const u = ['KB', 'MB', 'GB', 'TB']; let i = -1;
+  do { b /= 1024; i++; } while (b >= 1000 && i < u.length - 1);
+  return (b < 10 ? b.toFixed(1) : Math.round(b)) + ' ' + u[i];
+}
+function fmtEta(s) {
+  if (!(s > 0) || !isFinite(s)) return '';
+  if (s < 55) return `about ${Math.max(5, Math.round(s / 5) * 5)} s left`;
+  if (s < 3600) return `about ${Math.ceil(s / 60)} min left`;
+  return `about ${Math.floor(s / 3600)} h ${Math.ceil((s % 3600) / 60)} min left`;
+}
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const fmtById = (id) => (S && S.formats.find((f) => f.id === id)) || null;
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 5000);
+}
+
+async function api(path, body) {
+  const r = await fetch('/api/' + path, {
+    method: 'POST',
+    headers: { 'X-Token': TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  let data = {};
+  try { data = await r.json(); } catch (_) {}
+  if (!r.ok) throw new Error(data.error || `Something went wrong (${r.status}).`);
+  return data;
+}
+
+// ---------- connection ----------
+function showClosed(title, text) {
+  $('#closedTitle').textContent = title || 'Media Converter is closed';
+  $('#closedText').textContent = text || 'Open the app again to convert more files.';
+  $('#closed').hidden = false;
+}
+function connect() {
+  if (!TOKEN) { showClosed('Open Media Converter from its icon', 'This page only works when the app opens it.'); return; }
+  const es = new EventSource('/api/events?t=' + encodeURIComponent(TOKEN));
+  let failTimer = null;
+  es.onmessage = (e) => {
+    clearTimeout(failTimer); failTimer = null;
+    const next = JSON.parse(e.data);
+    if (pageVersion && next.version !== pageVersion) {
+      // A new version took over: load its interface.
+      sessionStorage.setItem('mc-updated', next.version);
+      location.reload();
+      return;
+    }
+    pageVersion = next.version;
+    restarting = false;
+    $('#closed').hidden = true;
+    S = next;
+    render();
+  };
+  es.addEventListener('quit', (e) => {
+    let d = {};
+    try { d = JSON.parse(e.data); } catch (_) {}
+    if (d.restart) {
+      restarting = true;
+      showClosed('Restarting Media Converter…', 'The new version opens here in a few seconds.');
+      $('#reconnect').hidden = true;
+      return; // keep listening; the new version answers at the same address
+    }
+    es.close(); showClosed(); setTimeout(() => window.close(), 400);
+  });
+  es.onerror = () => {
+    if (failTimer) return;
+    failTimer = setTimeout(() => {
+      failTimer = null;
+      if (es.readyState !== 1) { es.close(); $('#reconnect').hidden = false; showClosed(); }
+    }, restarting ? 30000 : 4000);
+  };
+}
+$('#reconnect').addEventListener('click', () => location.reload());
+
+// ---------- settings ----------
+function setSettings(patch) {
+  const s = { ...S.settings, ...patch };
+  const f = fmtById(s.format);
+  if (f && s.quality === 'copy' && !f.canCopy) s.quality = 'balanced';
+  S.settings = s;
+  render();
+  api('settings', s).catch((e) => toast(e.message));
+}
+
+function seg(el, name, options, value, onChange) {
+  const key = options.map((o) => o[0] + ':' + o[1]).join('|');
+  if (el.dataset.key !== key) {
+    el.dataset.key = key;
+    el.textContent = '';
+    for (const [v, label] of options) {
+      const lab = document.createElement('label');
+      const inp = document.createElement('input');
+      inp.type = 'radio'; inp.name = name; inp.value = v;
+      inp.addEventListener('change', () => { if (inp.checked) onChange(v); });
+      const span = document.createElement('span');
+      span.textContent = label;
+      lab.append(inp, span);
+      el.append(lab);
+    }
+  }
+  for (const inp of el.querySelectorAll('input')) {
+    inp.checked = inp.value === value;
+    inp.disabled = !!S.running;
+  }
+}
+
+function buildFormatTiles() {
+  for (const group of ['video', 'audio']) {
+    const box = $(group === 'video' ? '#fmtVideo' : '#fmtAudio');
+    if (box.childElementCount) continue;
+    for (const f of S.formats.filter((x) => x.group === group)) {
+      const lab = document.createElement('label');
+      lab.className = 'tile';
+      const inp = document.createElement('input');
+      inp.type = 'radio'; inp.name = 'format'; inp.value = f.id;
+      inp.addEventListener('change', () => { if (inp.checked) setSettings({ format: f.id }); });
+      const span = document.createElement('span');
+      span.textContent = f.label;
+      lab.append(inp, span);
+      box.append(lab);
+    }
+  }
+}
+
+const QHINT = {
+  video: {
+    copy: 'Keeps the video and sound exactly as they are and only changes the file type. Very fast, no quality loss.',
+    high: 'Close to the original. Bigger files.',
+    balanced: 'Looks good at a sensible size. A good default.',
+    small: 'Much smaller files, with some loss of detail.',
+  },
+  gif: { high: '640 px wide, 15 frames per second.', balanced: '480 px wide, 12 frames per second.', small: '320 px wide, 10 frames per second.' },
+  mp3: { high: 'About 245 kbps.', balanced: 'About 190 kbps. Sounds like the original to most people.', small: 'About 130 kbps.' },
+  m4a: { high: '256 kbps.', balanced: '192 kbps. Sounds like the original to most people.', small: '128 kbps.' },
+  ogg: { high: '160 kbps.', balanced: '128 kbps. Sounds like the original to most people.', small: '96 kbps.' },
+};
+
+function renderSettings() {
+  buildFormatTiles();
+  const s = S.settings;
+  const f = fmtById(s.format) || S.formats[0];
+  for (const inp of document.querySelectorAll('input[name=format]')) {
+    const fv = fmtById(inp.value);
+    inp.checked = inp.value === s.format;
+    inp.disabled = S.running || (fv && !fv.available);
+    inp.parentElement.title = fv && !fv.available ? `Your FFmpeg can't make ${fv.label} files (missing ${fv.missing}).` : '';
+  }
+  $('#fmtDesc').textContent = f.desc;
+
+  // Quality
+  let qopts = null;
+  if (!f.lossless) {
+    if (f.id === 'gif') qopts = [['high', 'Large'], ['balanced', 'Medium'], ['small', 'Small']];
+    else {
+      qopts = [];
+      if (f.canCopy) qopts.push(['copy', 'Original']);
+      qopts.push(['high', 'High'], ['balanced', 'Balanced'], ['small', 'Smaller']);
+    }
+  }
+  $('#qualityField').hidden = !qopts;
+  $('#qualityLabel').textContent = f.id === 'gif' ? 'Size' : 'Quality';
+  if (qopts) {
+    seg($('#quality'), 'quality', qopts, s.quality, (v) => setSettings({ quality: v }));
+    const table = f.group === 'video' ? (f.id === 'gif' ? QHINT.gif : QHINT.video) : QHINT[f.id];
+    $('#qualityHint').textContent = (table && table[s.quality]) || '';
+  }
+
+  // Video size + sound
+  const isVideo = f.group === 'video' && f.id !== 'gif';
+  $('#resField').hidden = !isVideo || s.quality === 'copy';
+  seg($('#resolution'), 'resolution', [['original', 'Original'], ['1080', '1080p'], ['720', '720p'], ['480', '480p']], s.resolution, (v) => setSettings({ resolution: v }));
+  $('#resHint').hidden = s.resolution === 'original';
+  $('#resHint').textContent = 'Bigger videos are shrunk to this size. Smaller ones stay as they are.';
+  $('#audioField').hidden = !isVideo;
+  const ra = $('#removeAudio');
+  ra.checked = !!s.removeAudio;
+  ra.disabled = !!S.running;
+
+  // Save to
+  seg($('#saveMode'), 'saveMode', [['same', 'Next to original'], ['folder', 'Another folder']], s.saveMode, (v) => {
+    if (v === 'folder' && !S.settings.outputDir) pickFolder();
+    else setSettings({ saveMode: v });
+  });
+  $('#pathRow').hidden = s.saveMode !== 'folder';
+  $('#outDir').innerHTML = '<bdi>' + esc(s.outputDir || '') + '</bdi>';
+  $('#outDir').title = s.outputDir || '';
+  $('#changeDir').disabled = !!S.running;
+  const hasUploads = S.jobs.some((j) => j.uploaded);
+  $('#saveHint').hidden = !(s.saveMode === 'same' && hasUploads);
+  $('#saveHint').textContent = 'Files you dragged in are saved to your Downloads folder.';
+}
+
+async function pickFolder() {
+  try {
+    await api('pick-folder');
+  } catch (e) { toast(e.message); }
+  render();
+}
+
+// ---------- FFmpeg ----------
+function mb(b) { return Math.round(b / 1048576); }
+
+function renderInstall() {
+  const ins = S.install || {};
+  const busy = !!ins.active && ins.kind === 'install';
+  $('#installIdle').hidden = busy;
+  $('#installBusy').hidden = !busy;
+  $('#installBox').hidden = !S.canInstall;
+  $('#manualSetup').open = $('#manualSetup').open || !S.canInstall;
+  $('#installNote').textContent = S.canInstall ? `Downloads about ${S.installMB} MB from ${S.installFrom}, the official FFmpeg builds for ${S.os === 'darwin' ? 'Mac' : 'Windows'}, and keeps it in Media Converter's own folder. Nothing else on your computer changes.` : '';
+  const failed = ins.kind === 'install' && ins.phase === 'failed';
+  $('#installError').hidden = !failed;
+  $('#installError').textContent = failed ? ins.error : '';
+  $('#ffInstall').textContent = failed ? 'Try again' : 'Install FFmpeg';
+  $('#ffInstall').disabled = !!ins.active;
+  if (busy) {
+    $('#installText').textContent = installText(ins);
+    setBar($('#installBar'), ins);
+  }
+}
+function installText(ins) {
+  switch (ins.phase) {
+    case 'checking': return `Finding the latest version on ${ins.source}…`;
+    case 'downloading': return ins.total ? `Downloading ${mb(ins.done)} of ${mb(ins.total)} MB` : `Downloading ${mb(ins.done)} MB`;
+    case 'unpacking': return 'Unpacking…';
+    case 'testing': return 'Checking that it works…';
+  }
+  return 'Working…';
+}
+function setBar(bar, p) {
+  const known = p.phase === 'downloading' && p.total > 0;
+  bar.classList.toggle('busy', !known);
+  bar.firstElementChild.style.width = known ? Math.min(100, (p.done / p.total) * 100).toFixed(1) + '%' : '';
+}
+
+let lastInstallPhase = '';
+function renderBanners() {
+  const box = $('#banners');
+  const items = [];
+  const up = S.updating || {};
+  if (up.active) {
+    const label = up.phase === 'downloading' ? (up.total ? `Downloading ${Math.floor((up.done / up.total) * 100)}%` : 'Downloading…') : up.phase === 'installing' ? 'Installing…' : 'Restarting…';
+    items.push({ key: 'app-busy', live: label, html: `<span class="text"><b>Updating Media Converter to ${esc(S.appUpdate ? S.appUpdate.version : '')}.</b> <span data-live></span></span><div class="bar" data-bar="app"><i></i></div>` });
+  } else if (up.error) {
+    items.push({ key: 'app-err', cls: 'error', html: `<span class="text"><b>The update didn't finish.</b> ${esc(up.error)}</span><span class="btns"><button class="btn small" data-do="app-update">Try again</button><button class="btn ghost small" data-do="dismiss" data-key="app-${esc(S.appUpdate ? S.appUpdate.version : '')}">Not now</button></span>` });
+  } else if (S.appUpdate && !dismissed.has('app-' + S.appUpdate.version)) {
+    const u = S.appUpdate;
+    const notes = u.notes ? `<span class="notes" title="${esc(u.notes)}">${esc(u.notes.split('\n').find((l) => l.trim()) || '')}</span>` : '';
+    items.push({ key: 'app', html: `<span class="text"><b>Media Converter ${esc(u.version)} is available.</b> You have ${esc(S.version)}.${S.jobs.length ? ' Updating clears the file list.' : ''}${notes}</span><span class="btns"><button class="btn primary small" data-do="app-update" ${S.running ? 'disabled title="Available when converting finishes"' : ''}>Update now</button><button class="btn ghost small" data-do="dismiss" data-key="app-${esc(u.version)}">Not now</button></span>` });
+  }
+
+  const ins = S.install || {};
+  if (ins.kind === 'update' && ins.active) {
+    items.push({ key: 'ff-busy', live: installText(ins), html: `<span class="text"><b>Updating FFmpeg.</b> <span data-live></span></span><div class="bar" data-bar="ff"><i></i></div><span class="btns"><button class="btn ghost small" data-do="ff-cancel">Cancel</button></span>` });
+  } else if (ins.kind === 'update' && ins.phase === 'failed' && !dismissed.has('ff-err')) {
+    items.push({ key: 'ff-err', cls: 'error', html: `<span class="text"><b>FFmpeg didn't update.</b> ${esc(ins.error)}</span><span class="btns"><button class="btn small" data-do="ff-update">Try again</button><button class="btn ghost small" data-do="dismiss" data-key="ff-err">Not now</button></span>` });
+  } else if (S.ffUpdate && !dismissed.has('ff-' + S.ffUpdate.version)) {
+    const f = S.ffUpdate;
+    items.push({ key: 'ff', html: `<span class="text"><b>FFmpeg ${esc(f.version)} is available.</b> You have ${esc(f.current || 'an older version')}.</span><span class="btns"><button class="btn primary small" data-do="ff-update" ${S.running ? 'disabled title="Available when converting finishes"' : ''}>Update FFmpeg</button><button class="btn ghost small" data-do="dismiss" data-key="ff-${esc(f.version)}">Not now</button></span>` });
+  }
+  if (ins.phase === 'done' && lastInstallPhase && lastInstallPhase !== 'done') {
+    toast(ins.kind === 'update' ? `FFmpeg is updated to ${S.ffmpeg.version}.` : 'FFmpeg is installed. You\u2019re ready to convert.');
+  }
+  lastInstallPhase = ins.phase || '';
+
+  const key = items.map((i) => i.key + (i.cls || '') + i.html).join('|');
+  if (box.dataset.key !== key) {
+    box.dataset.key = key;
+    box.innerHTML = items.map((i) => `<div class="banner ${i.cls || ''}">${i.html}</div>`).join('');
+  }
+  box.querySelectorAll('.banner').forEach((el, n) => {
+    const live = el.querySelector('[data-live]');
+    if (live && live.textContent !== items[n].live) live.textContent = items[n].live;
+  });
+  const ab = box.querySelector('[data-bar=app]');
+  if (ab) setBar(ab, up.phase === 'downloading' ? up : { phase: up.phase });
+  const fb = box.querySelector('[data-bar=ff]');
+  if (fb) setBar(fb, ins);
+}
+$('#banners').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-do]');
+  if (!b) return;
+  try {
+    switch (b.dataset.do) {
+      case 'dismiss': dismiss(b.dataset.key); break;
+      case 'app-update': await api('update/apply'); break;
+      case 'ff-update': dismissed.delete('ff-err'); await api('ffmpeg/update'); break;
+      case 'ff-cancel': await api('ffmpeg/cancel'); break;
+    }
+  } catch (err) { toast(err.message); }
+});
+
+function renderFF() {
+  renderInstall();
+  const pill = $('#ffPill');
+  const ff = S.ffmpeg;
+  pill.className = 'ff-pill' + (S.checking ? '' : ff.found ? ' ok' : ' bad');
+  pill.querySelector('span').textContent = S.checking ? 'Looking for FFmpeg…' : ff.found ? `FFmpeg ${ff.version}` : 'FFmpeg not found';
+  pill.title = ff.found ? ff.path : '';
+  const show = !S.checking && !ff.found;
+  $('#setup').hidden = !show;
+  if (show && !$('#setupSteps').dataset.os) {
+    $('#setupSteps').dataset.os = S.os;
+    $('#setupSteps').innerHTML = setupSteps(S.os);
+    for (const b of document.querySelectorAll('.cmd button')) {
+      b.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(b.dataset.cmd); b.textContent = 'Copied'; }
+        catch (_) { b.textContent = 'Select and copy'; }
+        setTimeout(() => (b.textContent = 'Copy'), 2000);
+      });
+    }
+  }
+}
+function cmdBox(c) { return `<span class="cmd"><code>${esc(c)}</code><button type="button" data-cmd="${esc(c)}">Copy</button></span>`; }
+function setupSteps(os) {
+  if (os === 'darwin') return `
+    <li>Open Terminal. Press Command and Space, type <b>Terminal</b>, then press Return.</li>
+    <li>Paste this and press Return. It takes a few minutes.<br>${cmdBox('brew install ffmpeg')}
+      <div class="muted-note">If Terminal says “command not found”, install Homebrew first from <a href="https://brew.sh" target="_blank" rel="noopener">brew.sh</a>. Or download FFmpeg from <a href="https://ffmpeg.org/download.html" target="_blank" rel="noopener">ffmpeg.org</a>, unzip it, and use Locate FFmpeg.</div></li>
+    <li>Come back here and click Check again.</li>`;
+  if (os === 'windows') return `
+    <li>Right-click the Start button and choose <b>Terminal</b> (or <b>Windows PowerShell</b>).</li>
+    <li>Paste this and press Enter. Accept the prompts if asked.<br>${cmdBox('winget install Gyan.FFmpeg')}
+      <div class="muted-note">Or download FFmpeg from <a href="https://ffmpeg.org/download.html" target="_blank" rel="noopener">ffmpeg.org</a>, unzip it, and use Locate FFmpeg to pick <b>ffmpeg.exe</b> in its bin folder.</div></li>
+    <li>Come back here and click Check again.</li>`;
+  return `<li>Install FFmpeg with your package manager:<br>${cmdBox('sudo apt install ffmpeg')}</li><li>Come back here and click Check again.</li>`;
+}
+$('#ffCheck').addEventListener('click', async (e) => {
+  e.target.disabled = true;
+  try { const r = await api('ffmpeg/check'); if (!r.found) toast('FFmpeg still isn’t installed. If you just installed it, wait for the install to finish and try again.'); }
+  catch (err) { toast(err.message); }
+  e.target.disabled = false;
+});
+$('#ffInstall').addEventListener('click', async () => {
+  try { await api('ffmpeg/install'); } catch (err) { toast(err.message); }
+});
+$('#installCancel').addEventListener('click', () => api('ffmpeg/cancel').catch((err) => toast(err.message)));
+$('#versionBtn').addEventListener('click', async (e) => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  b.textContent = 'Checking…';
+  try {
+    const r = await api('update/check');
+    for (const k of [...dismissed]) if (k.startsWith('app-') || k.startsWith('ff-')) dismissed.delete(k);
+    sessionStorage.setItem('mc-dismissed', JSON.stringify([...dismissed]));
+    if (!r.app && !r.ffmpeg) toast(`You have the latest version of Media Converter${S.ffmpeg.found ? ' and FFmpeg' : ''}.`);
+  } catch (err) { toast(err.message); }
+  b.disabled = false;
+  render();
+});
+$('#ffLocate').addEventListener('click', async () => {
+  try { await api('ffmpeg/locate'); } catch (err) { toast(err.message); }
+});
+
+// ---------- file rows ----------
+function warnFor(j, f) {
+  if (j.trimError) return j.trimError;
+  if (!f) return '';
+  if (f.group === 'video' && !j.hasVideo) return 'Audio only. Pick an audio format to convert this file.';
+  if (f.group === 'audio' && !j.hasAudio) return 'This video has no sound, so it can’t become an audio file.';
+  if (f.id === 'gif' && j.duration > 20 && !j.trimEnd) return 'Long clip. Trim it first, or the GIF will be very large.';
+  return '';
+}
+
+function statusHTML(j, f) {
+  switch (j.status) {
+    case 'probing': return '<span>Reading file…</span>';
+    case 'needs-ffmpeg': return '<span>Waiting for FFmpeg</span>';
+    case 'invalid': return `<span class="bad">${esc(j.error)}</span>`;
+    case 'ready': { const w = warnFor(j, f); return w ? `<span class="warn">${esc(w)}</span>` : '<span>Ready</span>'; }
+    case 'queued': return '<span>Waiting to start</span>';
+    case 'running': {
+      const parts = [];
+      if (j.duration > 0) parts.push(`<b>Converting ${Math.floor(j.progress * 100)}%</b>`);
+      else parts.push(`<b>Converting</b>`, `<span>${fmtDur(j.processed) || '0:00'} done</span>`);
+      if (j.speed) parts.push(`<span>${esc(j.speed.replace(/x$/, '×'))} speed</span>`);
+      const eta = fmtEta(j.eta);
+      if (eta) parts.push(`<span>${eta}</span>`);
+      return parts.join('');
+    }
+    case 'done': {
+      const parts = [`<span class="ok">Saved as ${esc(j.outName)}</span>`, `<span>${fmtSize(j.outSize)}</span>`];
+      if (j.size > 0 && j.outSize > 0) {
+        const r = j.outSize / j.size;
+        parts.push(`<span>${r < 0.95 ? Math.round((1 - r) * 100) + '% smaller' : r > 1.05 ? Math.round((r - 1) * 100) + '% larger' : 'about the same size'}</span>`);
+      }
+      return parts.join('');
+    }
+    case 'failed': return `<span class="bad">${esc(j.error)}</span>`;
+    case 'canceled': return '<span>Stopped</span>';
+  }
+  return '';
+}
+
+function metaHTML(j) {
+  const p = [];
+  const d = fmtDur(j.duration);
+  if (d) p.push(d);
+  if (j.hasVideo && j.width) p.push(`${j.width}×${j.height}`);
+  else if (j.status !== 'probing' && j.hasAudio && !j.hasVideo) p.push('Audio');
+  p.push(fmtSize(j.size));
+  if ((j.trimStart || j.trimEnd) && !j.trimError) p.push(`Trimmed ${esc(j.trimStart || '0:00')} to ${esc(j.trimEnd || 'end')}`);
+  return p.map((x) => `<span>${x}</span>`).join('');
+}
+
+function actionsFor(j) {
+  const a = [];
+  const busy = j.status === 'running' || j.status === 'queued';
+  const canTrim = (j.duration > 0) && ['ready', 'failed', 'canceled', 'done'].includes(j.status) && !S.running;
+  if (canTrim) a.push(['trim', openTrim.has(j.id) ? 'Hide trim' : 'Trim']);
+  if (busy) a.push(['stop', j.status === 'queued' ? 'Skip' : 'Stop']);
+  if (j.status === 'done') a.push(['show', S.os === 'darwin' ? 'Show in Finder' : S.os === 'windows' ? 'Show in folder' : 'Show file'], ['again', 'Convert again']);
+  if (j.status === 'failed' || j.status === 'canceled') a.push(['retry', 'Try again']);
+  if (j.status === 'failed' && j.detail) a.push(['details', openDetail.has(j.id) ? 'Hide details' : 'Details']);
+  if (!busy) a.push(['remove', '']);
+  return a;
+}
+
+async function act(j, what) {
+  try {
+    switch (what) {
+      case 'trim': openTrim.has(j.id) ? openTrim.delete(j.id) : openTrim.add(j.id); render(); if (openTrim.has(j.id)) rows.get(j.id)?.querySelector('.t-start')?.focus(); break;
+      case 'details': openDetail.has(j.id) ? openDetail.delete(j.id) : openDetail.add(j.id); render(); break;
+      case 'stop': await api('cancel', { id: j.id }); break;
+      case 'show': await api('reveal', { id: j.id }); break;
+      case 'again': case 'retry': await api('retry', { id: j.id }); break;
+      case 'remove': openTrim.delete(j.id); openDetail.delete(j.id); await api('remove', { id: j.id }); break;
+    }
+  } catch (e) { toast(e.message); }
+}
+
+function makeRow(j) {
+  const li = document.createElement('li');
+  li.className = 'job';
+  li.innerHTML = `<div class="fill"></div><div class="kind"></div>
+    <div class="body"><div class="name"></div><div class="meta"></div>
+      <div class="trim" hidden>
+        <label>Start <input class="t-start" placeholder="0:00" autocomplete="off" spellcheck="false"></label>
+        <label>End <input class="t-end" placeholder="end" autocomplete="off" spellcheck="false"></label>
+        <span>Use minutes:seconds, like 1:30</span>
+      </div>
+      <div class="status"></div><pre class="detail" hidden></pre></div>
+    <div class="acts"></div>`;
+  const send = (field, input) => {
+    api('job', { id: j.id, [field]: input.value }).catch((e) => toast(e.message));
+  };
+  for (const [cls, field] of [['.t-start', 'trimStart'], ['.t-end', 'trimEnd']]) {
+    const input = li.querySelector(cls);
+    let t;
+    input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => send(field, input), 450); });
+    input.addEventListener('change', () => { clearTimeout(t); send(field, input); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  }
+  return li;
+}
+
+function updateRow(li, j, f) {
+  li.className = 'job ' + j.status;
+  li.style.setProperty('--p', (j.progress * 100).toFixed(1) + '%');
+  const kind = j.status === 'done' ? 'done' : (j.status === 'failed' || j.status === 'invalid') ? 'bad' : j.hasVideo ? 'video' : j.hasAudio ? 'audio' : 'file';
+  const kindEl = li.querySelector('.kind');
+  if (kindEl.dataset.k !== kind) { kindEl.dataset.k = kind; kindEl.innerHTML = ICON[kind]; }
+  const name = li.querySelector('.name');
+  if (name.textContent !== j.name) name.textContent = j.name;
+  name.title = j.uploaded ? j.name : j.path;
+  const meta = metaHTML(j);
+  if (li._meta !== meta) { li._meta = meta; li.querySelector('.meta').innerHTML = meta; }
+  const st = statusHTML(j, f);
+  if (li._st !== st) { li._st = st; li.querySelector('.status').innerHTML = st; }
+
+  const trim = li.querySelector('.trim');
+  trim.hidden = !openTrim.has(j.id);
+  for (const [cls, val] of [['.t-start', j.trimStart], ['.t-end', j.trimEnd]]) {
+    const inp = li.querySelector(cls);
+    if (document.activeElement !== inp && inp.value !== val) inp.value = val;
+    inp.disabled = S.running;
+  }
+  const bad = !!j.trimError;
+  li.querySelector('.t-start').setAttribute('aria-invalid', bad && /start/i.test(j.trimError));
+  li.querySelector('.t-end').setAttribute('aria-invalid', bad && /end/i.test(j.trimError));
+  li.querySelector('.t-end').placeholder = fmtDur(j.duration) || 'end';
+
+  const det = li.querySelector('.detail');
+  det.hidden = !(j.status === 'failed' && openDetail.has(j.id));
+  if (det.textContent !== (j.detail || '')) det.textContent = j.detail || '';
+
+  const acts = actionsFor(j);
+  const key = acts.map((a) => a.join(':')).join('|');
+  const box = li.querySelector('.acts');
+  if (box.dataset.key !== key) {
+    const focused = box.contains(document.activeElement) ? document.activeElement.dataset.a : null;
+    box.dataset.key = key;
+    box.textContent = '';
+    for (const [what, label] of acts) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.a = what;
+      if (what === 'remove') { b.className = 'btn ghost small icon'; b.innerHTML = ICON.x; b.setAttribute('aria-label', 'Remove ' + j.name); b.title = 'Remove from list'; }
+      else { b.className = 'btn ghost small'; b.textContent = label; }
+      if (what === 'trim') b.setAttribute('aria-expanded', openTrim.has(j.id));
+      b.addEventListener('click', () => act(j, what));
+      box.append(b);
+      if (focused === what) b.focus();
+    }
+  }
+}
+
+function renderList() {
+  const list = $('#list');
+  const f = fmtById(S.settings.format);
+  const ids = new Set(S.jobs.map((j) => j.id));
+  for (const [id, li] of rows) if (!ids.has(id)) { li.remove(); rows.delete(id); }
+  let prev = null;
+  for (const j of S.jobs) {
+    let li = rows.get(j.id);
+    if (!li) { li = makeRow(j); rows.set(j.id, li); }
+    updateRow(li, j, f);
+    const want = prev ? prev.nextSibling : list.firstChild;
+    if (want !== li) list.insertBefore(li, want);
+    prev = li;
+  }
+  const n = S.jobs.length;
+  $('#filesTitle').textContent = n ? plural(n, 'file') : 'Files';
+  $('#empty').hidden = n > 0 || pending.length > 0 || !$('#setup').hidden;
+  $('#clearBtn').hidden = !S.jobs.some((j) => ['done', 'failed', 'canceled', 'invalid'].includes(j.status));
+}
+
+function renderPending() {
+  const ul = $('#pendingList');
+  ul.innerHTML = pending.map((p) => `<li class="job pending"><div class="kind">${ICON.file}</div><div class="body"><div class="name">${esc(p.name)}</div><div class="status"><span>Copying in ${Math.floor(p.pct * 100)}%</span></div></div><div></div></li>`).join('');
+  if (S) $('#empty').hidden = S.jobs.length > 0 || pending.length > 0 || !$('#setup').hidden;
+}
+
+function renderGo() {
+  const btn = $('#convertBtn');
+  const hint = $('#goHint');
+  const f = fmtById(S.settings.format);
+  const ready = S.jobs.filter((j) => j.status === 'ready');
+  if (S.running) {
+    const left = S.jobs.filter((j) => j.status === 'running' || j.status === 'queued').length;
+    btn.textContent = 'Stop converting';
+    btn.className = 'convert stop';
+    btn.disabled = false;
+    hint.textContent = left ? `${plural(left, 'file')} left` : 'Finishing…';
+    return;
+  }
+  btn.className = 'convert';
+  btn.textContent = ready.length ? `Convert ${plural(ready.length, 'file')}` : 'Convert';
+  btn.disabled = !ready.length || !S.ffmpeg.found || (f && !f.available);
+  if (S.checking) hint.textContent = 'Looking for FFmpeg…';
+  else if (!S.ffmpeg.found) hint.textContent = 'Set up FFmpeg first.';
+  else if (!S.jobs.length) hint.textContent = 'Add files to get started.';
+  else if (!ready.length) hint.textContent = S.jobs.some((j) => j.status === 'probing') ? 'Reading files…' : 'Nothing left to convert. Add more files, or use Convert again on a file.';
+  else {
+    const where = S.settings.saveMode === 'folder' ? 'in your chosen folder' : 'next to the originals';
+    hint.textContent = `Makes ${f.label} files ${where}.`;
+  }
+}
+
+function render() {
+  if (!S) return;
+  $('#versionBtn').textContent = 'Version ' + S.version;
+  renderBanners();
+  renderFF();
+  renderSettings();
+  renderList();
+  renderGo();
+}
+
+// ---------- actions ----------
+async function addFiles() {
+  try { await api('add-files'); } catch (e) { toast(e.message); }
+}
+$('#addBtn').addEventListener('click', addFiles);
+$('#addBtn2').addEventListener('click', addFiles);
+$('#clearBtn').addEventListener('click', () => api('clear').catch((e) => toast(e.message)));
+$('#changeDir').addEventListener('click', pickFolder);
+$('#removeAudio').addEventListener('change', (e) => setSettings({ removeAudio: e.target.checked }));
+$('#convertBtn').addEventListener('click', async () => {
+  try { await api(S.running ? 'stop' : 'start'); } catch (e) { toast(e.message); }
+});
+
+let quitArmed = null;
+$('#quitBtn').addEventListener('click', async (e) => {
+  const b = e.currentTarget;
+  if (S && S.running && !quitArmed) {
+    b.textContent = 'Stop and quit?';
+    quitArmed = setTimeout(() => { quitArmed = null; b.textContent = 'Quit'; }, 3500);
+    return;
+  }
+  clearTimeout(quitArmed);
+  try { await api('quit'); } catch (_) {}
+  showClosed();
+  setTimeout(() => window.close(), 400);
+});
+
+// ---------- drag and drop ----------
+let dragDepth = 0;
+const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+window.addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth++; $('#dropOverlay').hidden = false; });
+window.addEventListener('dragover', (e) => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+window.addEventListener('dragleave', (e) => { if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('#dropOverlay').hidden = true; });
+window.addEventListener('drop', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  $('#dropOverlay').hidden = true;
+  uploadFiles(Array.from(e.dataTransfer.files));
+});
+
+function xhrUpload(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/upload?name=' + encodeURIComponent(file.name));
+    x.setRequestHeader('X-Token', TOKEN);
+    x.setRequestHeader('Content-Type', 'application/octet-stream');
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.onload = () => {
+      let data = {};
+      try { data = JSON.parse(x.responseText); } catch (_) {}
+      if (x.status >= 200 && x.status < 300) resolve(data); else reject(new Error(data.error || 'Copy failed.'));
+    };
+    x.onerror = () => reject(new Error('Folders can’t be dropped. Drop the files inside the folder instead.'));
+    x.send(file);
+  });
+}
+let uploading = false;
+async function uploadFiles(files) {
+  for (const file of files) pending.push({ key: Math.random().toString(36).slice(2), name: file.name, pct: 0, file });
+  renderPending();
+  if (uploading) return;
+  uploading = true;
+  while (pending.length) {
+    const p = pending[0];
+    try {
+      const r = await xhrUpload(p.file, (v) => { p.pct = v; renderPending(); });
+      if (!r.added) toast(`${p.name} isn’t a file that can be added.`);
+    } catch (e) { toast(`${p.name}: ${e.message}`); }
+    pending.shift();
+    renderPending();
+  }
+  uploading = false;
+}
+
+const justUpdated = sessionStorage.getItem('mc-updated');
+if (justUpdated) {
+  sessionStorage.removeItem('mc-updated');
+  setTimeout(() => toast(`Updated to Media Converter ${justUpdated}.`), 300);
+}
+connect();
+})();
+</script>
+</body>
+</html>

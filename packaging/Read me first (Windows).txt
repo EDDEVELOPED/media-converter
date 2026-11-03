@@ -1,0 +1,13 @@
+Media Converter for Windows
+
+1. If you haven't already, right-click the zip and choose Extract All. You can move Media Converter.exe anywhere you like, such as your Desktop.
+
+2. Double-click Media Converter.exe.
+   The first time, Windows may show "Windows protected your PC" because the app isn't from a known publisher.
+   Click More info, then Run anyway. It only asks once.
+
+3. The app opens in its own window. If FFmpeg isn't installed yet, click Install FFmpeg and it sets itself up.
+
+Updates: when a new version of Media Converter or FFmpeg is out, the app asks when you open it. Click Update now.
+Converted files are saved next to the originals, or in a folder you choose. Originals are never changed.
+To close the app, click Quit or just close its window.

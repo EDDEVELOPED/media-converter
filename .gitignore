@@ -1,0 +1,4 @@
+dist/
+*.exe.new
+*.exe.old
+.DS_Store

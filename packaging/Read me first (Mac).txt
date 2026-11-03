@@ -1,0 +1,24 @@
+Media Converter for Mac (Apple Silicon and Intel, macOS 11 or newer)
+
+1. Drag "Media Converter" into your Applications folder.
+
+2. First time only: macOS blocks apps that aren't from the App Store or a registered developer.
+   To allow this one, open Terminal, paste this line, and press Return:
+
+      xattr -cr "/Applications/Media Converter.app"
+
+   (Another way: double-click the app, click Done on the warning, then open System Settings >
+   Privacy & Security, scroll down, and click Open Anyway.)
+
+3. Double-click Media Converter. It opens in its own window (in Chrome or Edge if you have one,
+   otherwise in your normal browser). If FFmpeg isn't installed yet, click Install FFmpeg and
+   it sets itself up.
+
+If macOS asks whether Media Converter can access a folder such as Downloads or Documents,
+click Allow so it can read your videos.
+
+Updates: when a new version of Media Converter or FFmpeg is out, the app asks when you open it.
+Click Update now. (Keep the app in Applications so it can update itself.)
+
+Converted files are saved next to the originals, or in a folder you choose. Originals are never changed.
+To close the app, click Quit or just close its window.
