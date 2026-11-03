@@ -1,0 +1,40 @@
+# Builds the Windows and Mac apps and publishes them as a GitHub release.
+# Run it from the Actions tab (Release > Run workflow) after changing VERSION
+# and release-notes.md. Installed copies offer the update the next time they open.
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(cat VERSION)"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::v$VERSION is already published. Change VERSION (and release-notes.md) to publish a new release."
+            exit 1
+          fi
+          gh release create "v$VERSION" --target "$GITHUB_SHA" \
+            --title "Media Converter $VERSION" --notes-file release-notes.md \
+            dist/MediaConverter-Windows.zip dist/MediaConverter-Mac.zip \
+            dist/MediaConverter-windows-amd64.exe dist/MediaConverter-macos-universal \
+            dist/checksums.txt

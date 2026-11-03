@@ -20,12 +20,13 @@ If FFmpeg isn't installed, the **Install FFmpeg** button downloads an official s
 It also checks the latest release of this repo (`EDDEVELOPED/media-converter`). If it's newer, the app offers to update, downloads the right file, checks it against `checksums.txt`, makes sure it runs, swaps it in and restarts. The open window reconnects to the new version by itself.
 
 ## Publishing a new version
-1. Change `VERSION` (for example to `1.2.0`) and write what's new in `release-notes.md`.
-2. Run `./release.sh`. It builds everything and creates the GitHub release with these files:
+1. Change `VERSION` (for example to `1.2.0`) and write what's new in `release-notes.md`. Commit and push.
+2. On GitHub, open **Actions > Release > Run workflow** (or push a tag like `v1.2.0`). GitHub builds the Windows and Mac apps and publishes the release with:
    - `MediaConverter-Windows.zip`, `MediaConverter-Mac.zip`: downloads for new users
    - `MediaConverter-windows-amd64.exe`, `MediaConverter-macos-universal`: what the app downloads to update itself
    - `checksums.txt`: SHA-256 of each file, which the app checks
-Release tags must look like `v1.2.0`. Drafts and pre-releases are ignored by the updater.
+
+Installed copies offer the update the next time they open. Drafts and pre-releases are ignored by the updater. `./release.sh` does the same from your own computer if you have the GitHub CLI.
 
 ## Files
 - `main.go` startup, single-instance check, local server
