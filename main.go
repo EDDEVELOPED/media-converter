@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -32,6 +34,19 @@ func main() {
 	cfgDir := configDir()
 	_ = os.MkdirAll(cfgDir, 0o755)
 	setupLog(cfgDir)
+
+	// Files passed on the command line: "Open with", or dropped on the app's icon.
+	var openFiles []string
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if st, err := os.Stat(arg); err == nil && !st.IsDir() {
+			if abs, err := filepath.Abs(arg); err == nil {
+				openFiles = append(openFiles, abs)
+			}
+		}
+	}
 
 	// After an update the new version takes over the old one's address and
 	// token, so the open window reconnects by itself.
@@ -56,8 +71,11 @@ func main() {
 		// One copy at a time: if the app is already running, just bring its window up.
 		ln, err = net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", preferredPort))
 		if err != nil {
-			if url, ok := existingInstance(cfgDir); ok {
+			if url, info, ok := existingInstance(cfgDir); ok {
 				log.Printf("already running, opening %s", url)
+				if len(openFiles) > 0 {
+					forwardFiles(info, openFiles)
+				}
 				openBrowser(url)
 				return
 			}
@@ -78,6 +96,9 @@ func main() {
 
 	app := newApp(cfgDir, token, addr)
 	defer app.cleanup()
+	if len(openFiles) > 0 {
+		go app.addPaths(openFiles, false)
+	}
 
 	srv := &http.Server{Handler: app.routes(), ReadHeaderTimeout: 15 * time.Second}
 	go func() {
@@ -123,7 +144,13 @@ func configDir() string {
 }
 
 func setupLog(dir string) {
-	f, err := os.Create(filepath.Join(dir, "log.txt"))
+	p := filepath.Join(dir, "log.txt")
+	if st, err := os.Stat(p); err == nil && st.Size() > 2<<20 {
+		_ = os.Remove(p) // start fresh once it gets big
+	}
+	// Append, so a second launch that just hands files to the running copy
+	// doesn't wipe its log.
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return
 	}
@@ -161,25 +188,36 @@ func removeInstance(dir string) {
 	}
 }
 
-func existingInstance(dir string) (string, bool) {
+func existingInstance(dir string) (string, instanceInfo, bool) {
+	var info instanceInfo
 	b, err := os.ReadFile(filepath.Join(dir, "instance.json"))
 	if err != nil {
-		return "", false
+		return "", info, false
 	}
-	var info instanceInfo
 	if json.Unmarshal(b, &info) != nil || info.Addr == "" {
-		return "", false
+		return "", info, false
 	}
 	req, _ := http.NewRequest("GET", "http://"+info.Addr+"/api/ping", nil)
 	req.Header.Set("X-Token", info.Token)
 	client := &http.Client{Timeout: 1500 * time.Millisecond}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", false
+		return "", info, false
 	}
 	resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return "", false
+		return "", info, false
 	}
-	return fmt.Sprintf("http://%s/?t=%s", info.Addr, info.Token), true
+	return fmt.Sprintf("http://%s/?t=%s", info.Addr, info.Token), info, true
+}
+
+// forwardFiles hands files to the copy that's already running.
+func forwardFiles(info instanceInfo, files []string) {
+	body, _ := json.Marshal(map[string][]string{"paths": files})
+	req, _ := http.NewRequest("POST", "http://"+info.Addr+"/api/add-paths", bytes.NewReader(body))
+	req.Header.Set("X-Token", info.Token)
+	req.Header.Set("Content-Type", "application/json")
+	if resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req); err == nil {
+		resp.Body.Close()
+	}
 }

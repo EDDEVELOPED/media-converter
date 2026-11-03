@@ -27,6 +27,7 @@ type Format struct {
 	Needs    []string `json:"-"`
 	CanCopy  bool     `json:"canCopy"`
 	Lossless bool     `json:"lossless"`
+	Extra    bool     `json:"extra"` // listed under "More" in the interface
 }
 
 type FormatView struct {
@@ -58,6 +59,36 @@ var formats = []Format{
 		Desc: "Lossless audio at about half the size of WAV."},
 	{ID: "ogg", Label: "OGG", Group: "audio", Ext: "ogg", Needs: []string{"libopus"},
 		Desc: "Opus audio. Very small files that still sound good."},
+
+	// More video formats
+	{ID: "avi", Label: "AVI", Group: "video", Ext: "avi", Needs: []string{"mpeg4", "libmp3lame"}, Extra: true,
+		Desc: "Xvid-style AVI with MP3 sound. For older players, DVD players and TVs that read AVI from USB."},
+	{ID: "wmv", Label: "WMV", Group: "video", Ext: "wmv", Needs: []string{"wmv2", "wmav2"}, Extra: true,
+		Desc: "Windows Media Video. For older Windows software and PowerPoint versions."},
+	{ID: "flv", Label: "FLV", Group: "video", Ext: "flv", Needs: []string{"libx264", "aac"}, Extra: true,
+		Desc: "H.264 in a Flash Video file. For older streaming and web tools."},
+	{ID: "mpg", Label: "MPEG-2", Group: "video", Ext: "mpg", Needs: []string{"mpeg2video", "mp2"}, Extra: true,
+		Desc: "MPEG-2 video, the DVD format. For DVD authoring and very old players."},
+	{ID: "ts", Label: "TS", Group: "video", Ext: "ts", Needs: []string{"libx264", "aac"}, CanCopy: true, Extra: true,
+		Desc: "H.264 in an MPEG transport stream. For broadcast tools, set-top boxes and some TVs."},
+	{ID: "3gp", Label: "3GP", Group: "video", Ext: "3gp", Needs: []string{"libx264", "aac"}, Extra: true,
+		Desc: "Small video for older phones."},
+	{ID: "ogv", Label: "OGV", Group: "video", Ext: "ogv", Needs: []string{"libtheora", "libvorbis"}, Extra: true,
+		Desc: "Theora video in an Ogg file. Fully open format."},
+
+	// More audio formats
+	{ID: "aac", Label: "AAC", Group: "audio", Ext: "aac", Needs: []string{"aac"}, Extra: true,
+		Desc: "Plain AAC audio stream, without the M4A wrapper."},
+	{ID: "wma", Label: "WMA", Group: "audio", Ext: "wma", Needs: []string{"wmav2"}, Extra: true,
+		Desc: "Windows Media Audio. For older Windows software and devices."},
+	{ID: "aiff", Label: "AIFF", Group: "audio", Ext: "aiff", Needs: []string{"pcm_s16be"}, Lossless: true, Extra: true,
+		Desc: "Uncompressed audio, Apple's version of WAV. Good for GarageBand and Logic."},
+	{ID: "opus", Label: "Opus", Group: "audio", Ext: "opus", Needs: []string{"libopus"}, Extra: true,
+		Desc: "Opus audio in its own file type. Very small files, great for voice."},
+	{ID: "ac3", Label: "AC3", Group: "audio", Ext: "ac3", Needs: []string{"ac3"}, Extra: true,
+		Desc: "Dolby Digital. Keeps 5.1 surround sound for home theater systems."},
+	{ID: "alac", Label: "ALAC", Group: "audio", Ext: "m4a", Needs: []string{"alac"}, Lossless: true, Extra: true,
+		Desc: "Apple Lossless in an M4A file. Perfect quality that plays in Apple Music and on iPhone."},
 }
 
 func formatByID(id string) (Format, bool) {
@@ -220,6 +251,8 @@ func (ff FFInfo) formatViews() []FormatView {
 // ---------- Reading a file ----------
 
 type ProbeInfo struct {
+	Container    string
+	FPS          float64
 	Duration     float64
 	HasVideo     bool
 	HasAudio     bool
@@ -232,22 +265,73 @@ type ProbeInfo struct {
 
 var (
 	durRe  = regexp.MustCompile(`Duration: (\d+):(\d{2}):(\d{2}(?:\.\d+)?)`)
+	inRe   = regexp.MustCompile(`Input #0, ([^,\s]+)`)
+	fpsRe  = regexp.MustCompile(`, (\d+(?:\.\d+)?) fps`)
 	dimRe  = regexp.MustCompile(`\b(\d{2,5})x(\d{2,5})\b`)
 	rotRe  = regexp.MustCompile(`rotation of (-?\d+(?:\.\d+)?) degrees`)
 	wordRe = regexp.MustCompile(`^[A-Za-z0-9_]+`)
 )
 
-func probe(ffPath, path string) (ProbeInfo, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, ffPath, "-hide_banner", "-nostdin", "-i", "file:"+path)
-	hideWindow(cmd)
-	out, _ := cmd.CombinedOutput() // always exits 1: no output file given
-	return parseProbe(string(out))
+type probeAttempt struct {
+	args      []string // input options placed before -i
+	needVideo bool     // a guess at the format only counts if it finds a picture
+}
+
+// probeAttempts lists the ways to try opening a file. Most files open on the
+// first try; the rest cover security-camera recordings and other files FFmpeg
+// can read but doesn't always recognise on its own.
+func probeAttempts(path string) []probeAttempt {
+	auto := probeAttempt{}
+	deep := probeAttempt{args: []string{"-probesize", "100M", "-analyzeduration", "100M"}}
+	dhav := probeAttempt{args: []string{"-f", "dhav"}}
+	dhavGuess := probeAttempt{args: []string{"-f", "dhav"}, needVideo: true}
+	h264 := probeAttempt{args: []string{"-fflags", "+genpts", "-f", "h264"}, needVideo: true}
+	hevc := probeAttempt{args: []string{"-fflags", "+genpts", "-f", "hevc"}, needVideo: true}
+	switch strings.ToLower(strings.TrimPrefix(filepath.Ext(path), ".")) {
+	case "dav": // Dahua and rebranded DVRs/NVRs
+		return []probeAttempt{dhav, auto, deep, h264, hevc}
+	case "264", "h264", "avc", "h26l":
+		return []probeAttempt{h264, auto, deep, hevc}
+	case "265", "h265", "hevc":
+		return []probeAttempt{hevc, auto, deep, h264}
+	}
+	return []probeAttempt{auto, deep, dhavGuess, h264, hevc}
+}
+
+func probe(ffPath, path string) (ProbeInfo, []string, error) {
+	var firstErr error
+	for _, at := range probeAttempts(path) {
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		args := append([]string{"-hide_banner", "-nostdin"}, at.args...)
+		cmd := exec.CommandContext(ctx, ffPath, append(args, "-i", "file:"+path)...)
+		hideWindow(cmd)
+		out, _ := cmd.CombinedOutput() // always exits 1: no output file given
+		cancel()
+		info, err := parseProbe(string(out))
+		if err == nil && at.needVideo && (!info.HasVideo || info.Width == 0) {
+			err = errors.New("no picture found")
+		}
+		if err == nil {
+			return info, at.args, nil
+		}
+		if firstErr == nil || len(at.args) == 0 {
+			firstErr = err // prefer what a normal open reported
+		}
+		if strings.Contains(err.Error(), "can't be found") || strings.Contains(err.Error(), "isn't allowed") {
+			break
+		}
+	}
+	if strings.EqualFold(filepath.Ext(path), ".dav") && firstErr != nil && !strings.Contains(firstErr.Error(), "can't be found") {
+		firstErr = errors.New("This .dav file couldn't be read. Some recorders encrypt their recordings; export the clip again from the recorder with encryption off, or export it as MP4 or AVI.")
+	}
+	return ProbeInfo{}, nil, firstErr
 }
 
 func parseProbe(s string) (ProbeInfo, error) {
 	var p ProbeInfo
+	if m := inRe.FindStringSubmatch(s); m != nil {
+		p.Container = m[1]
+	}
 	if m := durRe.FindStringSubmatch(s); m != nil {
 		h, _ := strconv.ParseFloat(m[1], 64)
 		mi, _ := strconv.ParseFloat(m[2], 64)
@@ -268,6 +352,9 @@ func parseProbe(s string) (ProbeInfo, error) {
 			if m := dimRe.FindStringSubmatch(rest); m != nil {
 				p.Width, _ = strconv.Atoi(m[1])
 				p.Height, _ = strconv.Atoi(m[2])
+			}
+			if m := fpsRe.FindStringSubmatch(rest); m != nil {
+				p.FPS, _ = strconv.ParseFloat(m[1], 64)
 			}
 		} else if i := strings.Index(line, ": Audio: "); i >= 0 {
 			if p.HasAudio {
@@ -333,10 +420,18 @@ func scaleFilter(res string, w, h int) string {
 
 func buildArgs(j *Job, s Settings, f Format, out string, start float64, hasEnd bool, dur float64) []string {
 	a := []string{"-hide_banner", "-nostdin", "-y", "-v", "error", "-progress", "pipe:1", "-nostats"}
-	if start > 0 {
+	a = append(a, j.InputArgs...)
+	// Fast seeking jumps straight to the start point, but camera recordings and
+	// raw streams (opened with a forced format) don't support it reliably, so
+	// those are read from the beginning and trimmed as they're converted.
+	fastSeek := len(j.InputArgs) == 0
+	if start > 0 && fastSeek {
 		a = append(a, "-ss", fmtSec(start))
 	}
 	a = append(a, "-i", "file:"+j.Path)
+	if start > 0 && !fastSeek {
+		a = append(a, "-ss", fmtSec(start))
+	}
 	if hasEnd && dur > 0 {
 		a = append(a, "-t", fmtSec(dur))
 	}
@@ -359,8 +454,21 @@ func buildArgs(j *Job, s Settings, f Format, out string, start float64, hasEnd b
 			a = append(a, "-c:a", "pcm_s16le")
 		case "flac":
 			a = append(a, "-c:a", "flac")
-		case "ogg":
+		case "ogg", "opus":
 			opus()
+		case "aac":
+			a = append(a, "-c:a", "aac", "-b:a", pick(q, "256k", "192k", "128k"))
+		case "wma":
+			a = append(a, "-c:a", "wmav2", "-b:a", pick(q, "192k", "160k", "128k"))
+			if j.MultiChannel {
+				a = append(a, "-ac", "2") // WMA is stereo at most
+			}
+		case "aiff":
+			a = append(a, "-c:a", "pcm_s16be")
+		case "ac3":
+			a = append(a, "-c:a", "ac3", "-b:a", pick(q, "448k", "384k", "224k"))
+		case "alac":
+			a = append(a, "-c:a", "alac", "-movflags", "+faststart")
 		}
 		return append(a, "file:"+out)
 	}
@@ -408,7 +516,21 @@ func buildArgs(j *Job, s Settings, f Format, out string, start float64, hasEnd b
 	case "webm":
 		a = append(a, "-c:v", "libvpx-vp9", "-crf", pick(q, "30", "34", "40"), "-b:v", "0",
 			"-row-mt", "1", "-deadline", "good", "-cpu-used", "4", "-pix_fmt", "yuv420p")
-	default: // mp4, mov, mkv
+	case "avi":
+		a = append(a, "-c:v", "mpeg4", "-q:v", pick(q, "2", "4", "7"), "-tag:v", "XVID", "-pix_fmt", "yuv420p")
+	case "wmv":
+		a = append(a, "-c:v", "wmv2", "-q:v", pick(q, "2", "4", "7"), "-pix_fmt", "yuv420p")
+	case "mpg":
+		a = append(a, "-c:v", "mpeg2video", "-q:v", pick(q, "2", "4", "7"), "-pix_fmt", "yuv420p")
+		if r := mpeg2Rate(j.FPS); r != "" {
+			a = append(a, "-r", r) // MPEG-2 only allows standard frame rates
+		}
+	case "ogv":
+		a = append(a, "-c:v", "libtheora", "-q:v", pick(q, "9", "7", "5"), "-pix_fmt", "yuv420p")
+	case "3gp":
+		a = append(a, "-c:v", "libx264", "-preset", "medium", "-crf", pick(q, "20", "24", "28"),
+			"-profile:v", "baseline", "-pix_fmt", "yuv420p")
+	default: // mp4, mov, mkv, flv, ts
 		a = append(a, "-c:v", "libx264", "-preset", "medium", "-crf", pick(q, "18", "23", "28"), "-pix_fmt", "yuv420p")
 	}
 	a = append(a, "-sn", "-dn")
@@ -417,14 +539,52 @@ func buildArgs(j *Job, s Settings, f Format, out string, start float64, hasEnd b
 		a = append(a, "-an")
 	case f.ID == "webm":
 		opus()
+	case f.ID == "avi":
+		a = append(a, "-c:a", "libmp3lame", "-b:a", pick(q, "192k", "160k", "128k"))
+	case f.ID == "wmv":
+		a = append(a, "-c:a", "wmav2", "-b:a", pick(q, "192k", "160k", "128k"))
+		if j.MultiChannel {
+			a = append(a, "-ac", "2")
+		}
+	case f.ID == "mpg":
+		a = append(a, "-c:a", "mp2", "-b:a", pick(q, "256k", "224k", "192k"), "-ar", "48000") // DVD-standard sound
+		if j.MultiChannel {
+			a = append(a, "-ac", "2")
+		}
+	case f.ID == "ogv":
+		a = append(a, "-c:a", "libvorbis", "-q:a", pick(q, "6", "4", "3"))
+	case f.ID == "3gp":
+		a = append(a, "-c:a", "aac", "-b:a", pick(q, "128k", "96k", "64k"), "-ac", "2")
 	default:
 		a = append(a, "-c:a", "aac", "-b:a", pick(q, "192k", "160k", "128k"))
 	}
-	if f.Ext == "mp4" || f.Ext == "mov" {
+	if f.Ext == "mp4" || f.Ext == "mov" || f.Ext == "3gp" {
 		a = append(a, "-movflags", "+faststart")
 	}
 	a = append(a, "-max_muxing_queue_size", "1024")
 	return append(a, "file:"+out)
+}
+
+// mpeg2Rate picks the nearest frame rate MPEG-2 allows, or "" if the
+// video's rate is already allowed. Security cameras often record at 12-20 fps.
+func mpeg2Rate(fps float64) string {
+	rates := []struct {
+		v float64
+		s string
+	}{{23.976, "24000/1001"}, {24, "24"}, {25, "25"}, {29.97, "30000/1001"}, {30, "30"}, {50, "50"}, {59.94, "60000/1001"}, {60, "60"}}
+	if fps <= 0 {
+		return "30"
+	}
+	best := rates[0]
+	for _, r := range rates {
+		if math.Abs(fps-r.v) < 0.01 {
+			return ""
+		}
+		if math.Abs(fps-r.v) < math.Abs(fps-best.v) {
+			best = r
+		}
+	}
+	return best.s
 }
 
 func friendlyError(stderr string, s Settings, f Format) string {

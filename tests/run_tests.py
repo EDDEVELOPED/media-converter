@@ -74,7 +74,7 @@ def run(name, files, settings, trim=None, expect="done"):
         if j["status"] == "done":
             p = probe(j["output"])
             streams = [(x["codec_type"], x["codec_name"], x.get("width"), x.get("height"), x.get("channels"), x.get("codec_tag_string")) for x in p["streams"]]
-            info = f"{float(p['format']['duration']):.2f}s {streams}"
+            info = f"{float(p['format'].get('duration', 0) or 0):.2f}s {streams}"
         else:
             info = j["error"] or j["status"]
         results.append(ok)
@@ -102,6 +102,37 @@ run("no-sound video to mp3 fails", ["odd size no audio.mp4"], {"format": "mp3"},
 run("not a video", ["notes.mp4"], {"format": "mp4"}, expect="invalid")
 # Same name again: must not overwrite, should become "(converted)"
 run("name clash", ["Shop walkaround.mov"], {"format": "mp4"})
+
+# ---- Security-camera recordings and raw streams
+for f in ["cam1 plain.dav", "cam2 dahua header.dav", "cam3 export header.dav", "cam4 h265.dav", "dvr raw.264"]:
+    st = run(f"camera file -> mp4", [f], {"format": "mp4"})
+    j = st["jobs"][0]
+    print(f"      container={j['container']} fps={j['fps']} audio={j['hasAudio']} duration={j['duration']}")
+st = run("dav unknown header keeps sound+fps", ["cam3 export header.dav"], {"format": "mp4"})
+p = probe(st["jobs"][0]["output"])
+v = [x for x in p["streams"] if x["codec_type"] == "video"]
+fps_out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", st["jobs"][0]["output"]], capture_output=True, text=True).stdout.strip()
+ok = any(x["codec_type"] == "audio" for x in p["streams"]) and fps_out == "20/1"
+print(f"{'PASS' if ok else 'FAIL'}  unknown-header .dav: audio kept, {fps_out} fps")
+run("dav 15fps -> MPEG-2", ["cam2 dahua header.dav"], {"format": "mpg"})
+st = run("dav trim 0:01-0:03", ["cam1 plain.dav"], {"format": "mp4"}, trim=("0:01", "0:03"))
+d = float(probe(st["jobs"][0]["output"])["format"].get("duration", 0) or 0)
+print(f"{'PASS' if 1.8 < d < 2.3 else 'FAIL'}  trimmed .dav is {d:.2f}s long (expected 2s)")
+st = run("raw .264 trim 0:01-0:03", ["dvr raw.264"], {"format": "mp4"}, trim=("0:01", "0:03"))
+d = float(probe(st["jobs"][0]["output"])["format"].get("duration", 0) or 0)
+print(f"{'PASS' if 1.8 < d < 2.3 else 'FAIL'}  trimmed raw stream is {d:.2f}s long (expected 2s)")
+run("5.1 source -> wmv", ["phone vertical 5.1.mkv"], {"format": "wmv"})
+run("5.1 source -> 3gp", ["phone vertical 5.1.mkv"], {"format": "3gp"})
+run("dav -> mp3 (sound only)", ["cam1 plain.dav"], {"format": "mp3"})
+
+# ---- More output formats
+for fmt in ["avi", "wmv", "flv", "mpg", "ts", "3gp", "ogv"]:
+    run(f"video {fmt}", ["Shop walkaround.mov"], {"format": fmt})
+run("ts copy", ["Shop walkaround.mov"], {"format": "ts", "quality": "copy"})
+for fmt in ["aac", "wma", "aiff", "opus", "ac3", "alac"]:
+    run(f"audio {fmt}", ["voicemail.wav"], {"format": fmt})
+for fmt in ["mp3", "wma", "ac3", "mpg", "avi"]:
+    run(f"5.1 source -> {fmt}", ["phone vertical 5.1.mkv"], {"format": fmt})
 
 # Trim validation
 call("clear")

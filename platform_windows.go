@@ -129,7 +129,8 @@ $owner = New-Object System.Windows.Forms.Form
 $owner.TopMost = $true
 `
 
-const mediaFilter = "Video and audio files|*.mp4;*.mov;*.m4v;*.mkv;*.avi;*.wmv;*.webm;*.flv;*.mpg;*.mpeg;*.ts;*.mts;*.m2ts;*.3gp;*.gif;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.aif;*.aiff;*.amr|All files|*.*"
+// All files comes first so nothing FFmpeg could read is ever hidden.
+const mediaFilter = "All files (*.*)|*.*|Video and audio files|*.264;*.265;*.266;*.3g2;*.3gp;*.3gpp;*.amv;*.asf;*.avc;*.avi;*.avs;*.bik;*.dav;*.dif;*.divx;*.dv;*.dvr-ms;*.evo;*.f4v;*.flv;*.gxf;*.h261;*.h263;*.h264;*.h265;*.h26l;*.hevc;*.ifv;*.ivf;*.ivr;*.m1v;*.m2p;*.m2t;*.m2ts;*.m2v;*.m4v;*.mj2;*.mjpeg;*.mjpg;*.mk3d;*.mkv;*.mod;*.mov;*.mp4;*.mpe;*.mpeg;*.mpg;*.mpv;*.mts;*.mxf;*.nsv;*.nut;*.obu;*.ogm;*.ogv;*.ps;*.qt;*.rm;*.rmvb;*.roq;*.swf;*.tod;*.tp;*.trp;*.ts;*.vc1;*.viv;*.vob;*.vro;*.webm;*.wmv;*.wtv;*.xmv;*.xvid;*.y4m;*.yuv;*.gif;*.apng;*.3ga;*.8svx;*.aa;*.aa3;*.aac;*.aax;*.ac3;*.ac4;*.adts;*.adx;*.aif;*.aifc;*.aiff;*.al;*.amr;*.ape;*.au;*.awb;*.caf;*.dff;*.dsf;*.dts;*.dtshd;*.eac3;*.ec3;*.flac;*.g722;*.g723;*.g726;*.g729;*.gsm;*.m4a;*.m4b;*.m4r;*.mka;*.mlp;*.mp1;*.mp2;*.mp3;*.mpa;*.mpc;*.oga;*.ogg;*.oma;*.opus;*.qcp;*.ra;*.ram;*.rka;*.shn;*.snd;*.spx;*.tak;*.thd;*.tta;*.voc;*.w64;*.wav;*.wma;*.wv;*.xa"
 
 func lines(out string) []string {
 	var res []string

@@ -246,6 +246,21 @@ legend { padding: 0; margin-bottom: 6px; font-size: 12.5px; color: var(--ink-2);
 .tile input:checked + span { background: var(--ink); border-color: var(--ink); color: var(--panel); }
 .tile input:focus-visible + span, .seg input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 .tile input:disabled + span { opacity: .4; cursor: not-allowed; }
+.tile.more { display: block; }
+.tile.more select {
+  appearance: none; -webkit-appearance: none; display: block; width: 100%;
+  height: 34px; padding: 0 22px 0 10px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink); font-weight: 600; font-size: 13px; cursor: pointer;
+  text-align: center; text-align-last: center;
+}
+.tile.more:hover select { border-color: var(--ink-3); }
+.tile.more select.on { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+.tile.more select:disabled { opacity: .4; cursor: not-allowed; }
+.tile.more::after {
+  content: ""; position: absolute; right: 11px; top: 50%; margin-top: -2px; pointer-events: none;
+  border: 4px solid transparent; border-top-color: var(--ink-2); border-bottom: 0;
+}
+.tile.more.on::after { border-top-color: var(--panel); }
 .fmt-desc { margin: 0 0 16px; font-size: 13px; color: var(--ink-2); min-height: 38px; }
 .field { margin-bottom: 14px; }
 .field-label { display: block; margin-bottom: 6px; font-size: 12.5px; color: var(--ink-2); }
@@ -362,9 +377,9 @@ legend { padding: 0; margin-bottom: 6px; font-size: 12.5px; color: var(--ink-2);
       <div id="empty" class="drop">
         <div>
           <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="14" width="32" height="24" rx="4"/><path d="M38 23l11-6v18l-11-6"/><path d="M22 20v12M17 27l5 5 5-5"/></svg>
-          <p class="drop-title">Drop videos or audio here</p>
+          <p class="drop-title">Drop any video or audio file here</p>
           <p class="drop-sub">or <button class="linkish" id="addBtn2" type="button">choose files</button> from your computer</p>
-          <p class="drop-note">Converted files are saved next to the originals unless you pick another folder. Originals are never changed.</p>
+          <p class="drop-note">Phone and camera videos, security-camera recordings such as .dav, music, voice memos, and anything else FFmpeg can read. Converted files are saved next to the originals unless you pick another folder. Originals are never changed.</p>
         </div>
       </div>
       <ul id="list" class="list"></ul>
@@ -563,7 +578,7 @@ function buildFormatTiles() {
   for (const group of ['video', 'audio']) {
     const box = $(group === 'video' ? '#fmtVideo' : '#fmtAudio');
     if (box.childElementCount) continue;
-    for (const f of S.formats.filter((x) => x.group === group)) {
+    for (const f of S.formats.filter((x) => x.group === group && !x.extra)) {
       const lab = document.createElement('label');
       lab.className = 'tile';
       const inp = document.createElement('input');
@@ -572,6 +587,18 @@ function buildFormatTiles() {
       const span = document.createElement('span');
       span.textContent = f.label;
       lab.append(inp, span);
+      box.append(lab);
+    }
+    const extras = S.formats.filter((x) => x.group === group && x.extra);
+    if (extras.length) {
+      const lab = document.createElement('label');
+      lab.className = 'tile more';
+      const sel = document.createElement('select');
+      sel.dataset.group = group;
+      sel.setAttribute('aria-label', `More ${group} formats`);
+      sel.innerHTML = '<option value="">More…</option>' + extras.map((f) => `<option value="${f.id}">${esc(f.label)}</option>`).join('');
+      sel.addEventListener('change', () => { if (sel.value) setSettings({ format: sel.value }); });
+      lab.append(sel);
       box.append(lab);
     }
   }
@@ -588,7 +615,11 @@ const QHINT = {
   mp3: { high: 'About 245 kbps.', balanced: 'About 190 kbps. Sounds like the original to most people.', small: 'About 130 kbps.' },
   m4a: { high: '256 kbps.', balanced: '192 kbps. Sounds like the original to most people.', small: '128 kbps.' },
   ogg: { high: '160 kbps.', balanced: '128 kbps. Sounds like the original to most people.', small: '96 kbps.' },
+  wma: { high: '192 kbps.', balanced: '160 kbps.', small: '128 kbps.' },
+  ac3: { high: '448 kbps.', balanced: '384 kbps, the DVD standard.', small: '224 kbps.' },
 };
+QHINT.aac = QHINT.m4a;
+QHINT.opus = QHINT.ogg;
 
 function renderSettings() {
   buildFormatTiles();
@@ -599,6 +630,17 @@ function renderSettings() {
     inp.checked = inp.value === s.format;
     inp.disabled = S.running || (fv && !fv.available);
     inp.parentElement.title = fv && !fv.available ? `Your FFmpeg can't make ${fv.label} files (missing ${fv.missing}).` : '';
+  }
+  for (const sel of document.querySelectorAll('.tile.more select')) {
+    const on = f.extra && f.group === sel.dataset.group;
+    sel.value = on ? f.id : '';
+    sel.classList.toggle('on', on);
+    sel.parentElement.classList.toggle('on', on);
+    sel.disabled = !!S.running;
+    for (const o of sel.options) {
+      const fv = fmtById(o.value);
+      if (fv) { o.disabled = !fv.available; o.title = fv.available ? '' : `Your FFmpeg can't make ${fv.label} files.`; }
+    }
   }
   $('#fmtDesc').textContent = f.desc;
 
@@ -847,8 +889,10 @@ function statusHTML(j, f) {
   return '';
 }
 
+const CONTAINERS = { dhav: 'Dahua DVR recording', h264: 'Raw H.264 stream', hevc: 'Raw H.265 stream' };
 function metaHTML(j) {
   const p = [];
+  if (CONTAINERS[j.container]) p.push(CONTAINERS[j.container]);
   const d = fmtDur(j.duration);
   if (d) p.push(d);
   if (j.hasVideo && j.width) p.push(`${j.width}×${j.height}`);

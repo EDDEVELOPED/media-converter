@@ -40,22 +40,25 @@ func defaultSettings() Settings {
 }
 
 type Job struct {
-	ID           int     `json:"id"`
-	Path         string  `json:"path"`
-	Name         string  `json:"name"`
-	Size         int64   `json:"size"`
-	Uploaded     bool    `json:"uploaded"`
-	Duration     float64 `json:"duration"`
-	HasVideo     bool    `json:"hasVideo"`
-	HasAudio     bool    `json:"hasAudio"`
-	Width        int     `json:"width"`
-	Height       int     `json:"height"`
-	VideoCodec   string  `json:"videoCodec"`
-	AudioCodec   string  `json:"audioCodec"`
-	MultiChannel bool    `json:"-"`
-	TrimStart    string  `json:"trimStart"`
-	TrimEnd      string  `json:"trimEnd"`
-	TrimError    string  `json:"trimError"`
+	ID           int      `json:"id"`
+	Path         string   `json:"path"`
+	Name         string   `json:"name"`
+	Size         int64    `json:"size"`
+	Uploaded     bool     `json:"uploaded"`
+	Duration     float64  `json:"duration"`
+	HasVideo     bool     `json:"hasVideo"`
+	HasAudio     bool     `json:"hasAudio"`
+	Width        int      `json:"width"`
+	Height       int      `json:"height"`
+	VideoCodec   string   `json:"videoCodec"`
+	AudioCodec   string   `json:"audioCodec"`
+	MultiChannel bool     `json:"-"`
+	Container    string   `json:"container"`
+	FPS          float64  `json:"fps"`
+	InputArgs    []string `json:"-"`
+	TrimStart    string   `json:"trimStart"`
+	TrimEnd      string   `json:"trimEnd"`
+	TrimError    string   `json:"trimError"`
 	// probing | needs-ffmpeg | invalid | ready | queued | running | done | failed | canceled
 	Status    string  `json:"status"`
 	Progress  float64 `json:"progress"`
@@ -351,7 +354,7 @@ func (a *App) probeJob(j *Job) {
 	a.mu.Lock()
 	ff := a.ff.Path
 	a.mu.Unlock()
-	info, err := probe(ff, j.Path)
+	info, inArgs, err := probe(ff, j.Path)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if j.Status != "probing" {
@@ -364,6 +367,7 @@ func (a *App) probeJob(j *Job) {
 		j.Duration, j.HasVideo, j.HasAudio = info.Duration, info.HasVideo, info.HasAudio
 		j.Width, j.Height = info.Width, info.Height
 		j.VideoCodec, j.AudioCodec, j.MultiChannel = info.VideoCodec, info.AudioCodec, info.MultiChannel
+		j.Container, j.FPS, j.InputArgs = info.Container, info.FPS, inArgs
 		j.Status = "ready"
 	}
 	a.notify()
