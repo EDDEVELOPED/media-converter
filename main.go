@@ -23,8 +23,9 @@ const (
 	preferredPort = 47391
 )
 
-// appVersion is set by build.sh from the VERSION file.
-var appVersion = "1.1.0"
+// appVersion is set by build.sh from the VERSION file. Builds made without
+// it say "dev" and never offer to replace themselves with a release.
+var appVersion = "dev"
 
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
