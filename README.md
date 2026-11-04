@@ -24,24 +24,6 @@ If FFmpeg isn't installed, the **Install FFmpeg** button downloads an official s
 
 It also checks this repo's releases. If there's a newer one with a file for that computer, the app offers to update, downloads the file, checks it against `checksums.txt`, makes sure it runs, swaps it in and restarts. The open window reconnects to the new version by itself. Drafts, pre-releases and releases without files are skipped.
 
-## Publishing a new version
-1. Change `VERSION` (for example to `1.3.0`) and write what's new in `release-notes.md`. Commit and push.
-2. Then either:
-   - open **Actions > Release > Run workflow**, or
-   - create a release on GitHub (**Releases > Draft a new release**) with a version tag such as `v1.3.0` and publish it.
-   - for a release that already exists without files: open it, click **Edit**, then **Update release** (works from a phone; GitHub's phone website hides the Run workflow button).
-
-   Either way, GitHub builds the Windows and Mac apps and attaches them to the release. If a release for that version already exists without files, Run workflow fills it in, along with a title and notes if they're missing.
-
-Don't use **Re-run** on an old run: it rebuilds that old version, which is already published, so it stops without changing anything.
-
-The release ends up with:
-- `MediaConverter-Windows.zip`, `MediaConverter-Mac.zip`: downloads for new users
-- `MediaConverter-windows-amd64.exe`, `MediaConverter-macos-universal`: what the app downloads to update itself
-- `checksums.txt`: SHA-256 of each file, which the app checks
-
-`./release.sh` does the same from your own computer if you have the GitHub CLI.
-
 ## Files
 - `main.go` startup, single-instance check, opening files passed by "Open with", local server
 - `app.go` file queue, conversion runner, HTTP API

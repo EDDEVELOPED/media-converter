@@ -1,6 +1,5 @@
 #!/bin/sh
-# Publishes a new version: bump VERSION, write release-notes.md, then run ./release.sh
-# Needs the GitHub CLI (gh) signed in to an account that can push to the repo.
+# Builds and publishes a release with the GitHub CLI.
 set -e
 cd "$(dirname "$0")"
 VERSION="$(cat VERSION)"

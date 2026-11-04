@@ -1,16 +1,4 @@
 # Builds the Windows and Mac apps and attaches them to a GitHub release.
-#
-# To publish a new version, change VERSION and release-notes.md, push, then either:
-#   - Actions > Release > Run workflow. This creates release vX.Y.Z, or fills in
-#     a release for that version that was made on GitHub without files.
-#   - Releases > Draft a new release, tag it with the version (for example
-#     v1.3.0) and publish it. This workflow then builds and attaches the files.
-#   - Or, for a release that already exists without files, open it, click
-#     Edit, then Update release. That works from a phone too.
-# Installed copies offer the update the next time they open.
-#
-# Re-running an old run rebuilds that old version, which is already published,
-# so it stops without changing anything. Use Run workflow instead.
 name: Release
 
 on:
@@ -67,7 +55,7 @@ jobs:
                 echo "::notice::$TAG already has its files, so nothing was built."
                 SKIP=1
               else
-                echo "::error::$TAG is already published with its files. To publish a new version, change VERSION (and release-notes.md), push, then click Run workflow."
+                echo "::error::$TAG is already published with its files."
                 exit 1
               fi
             else
