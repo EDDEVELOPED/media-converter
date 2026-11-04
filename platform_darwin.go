@@ -122,7 +122,7 @@ func openBrowser(url string) {
 func fatal(msg string) {
 	log.Print(msg)
 	esc := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(msg)
-	_, _ = osa(`display alert "Media Converter" message "` + esc + `" as critical`)
+	_, _ = osa(`display alert "` + appName + `" message "` + esc + `" as critical`)
 }
 
 // detach lets the restarted app outlive this process.

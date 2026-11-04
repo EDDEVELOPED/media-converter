@@ -18,12 +18,12 @@ def sha(p): return hashlib.sha256(open(p, "rb").read()).hexdigest()
 # --- builds: the "installed" old version and the "published" new one
 env = dict(os.environ, CGO_ENABLED="0")
 subprocess.run(["go", "build", "-ldflags", "-X main.appVersion=1.0.0", "-o", f"{APPDIR}/mc", "."], cwd=SRC, env=env, check=True)
-subprocess.run(["go", "build", "-ldflags", "-X main.appVersion=1.2.0", "-o", f"{SRV}/rel/MediaConverter-linux-amd64", "."], cwd=SRC, env=env, check=True)
-asset = f"{SRV}/rel/MediaConverter-linux-amd64"
-open(f"{SRV}/rel/checksums.txt", "w").write(f"{sha(asset)}  MediaConverter-linux-amd64\n")
-json.dump({"tag_name": "v1.2.0", "html_url": "https://github.com/EDDEVELOPED/media-converter/releases/tag/v1.2.0",
+subprocess.run(["go", "build", "-ldflags", "-X main.appVersion=1.2.0", "-o", f"{SRV}/rel/FFmpeg-GUI-Media-Converter-linux-amd64", "."], cwd=SRC, env=env, check=True)
+asset = f"{SRV}/rel/FFmpeg-GUI-Media-Converter-linux-amd64"
+open(f"{SRV}/rel/checksums.txt", "w").write(f"{sha(asset)}  FFmpeg-GUI-Media-Converter-linux-amd64\n")
+json.dump({"tag_name": "v1.2.0", "html_url": "https://github.com/EDDEVELOPED/ffmpeg-gui/releases/tag/v1.2.0",
            "body": "Faster GIFs and a clearer progress bar.\n\nAlso fixes trimming very short clips.", "draft": False, "prerelease": False,
-           "assets": [{"name": "MediaConverter-linux-amd64", "browser_download_url": f"{BASE}/rel/MediaConverter-linux-amd64", "size": os.path.getsize(asset)},
+           "assets": [{"name": "FFmpeg-GUI-Media-Converter-linux-amd64", "browser_download_url": f"{BASE}/rel/FFmpeg-GUI-Media-Converter-linux-amd64", "size": os.path.getsize(asset)},
                       {"name": "checksums.txt", "browser_download_url": f"{BASE}/rel/checksums.txt", "size": 100}]},
           open(f"{SRV}/rel/latest.json", "w"))
 

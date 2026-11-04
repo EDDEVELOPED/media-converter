@@ -89,9 +89,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          FILES=(dist/MediaConverter-Windows.zip dist/MediaConverter-Mac.zip dist/MediaConverter-windows-amd64.exe dist/MediaConverter-macos-universal dist/checksums.txt)
+          FILES=(dist/FFmpeg-GUI-Media-Converter-Windows.zip dist/FFmpeg-GUI-Media-Converter-Mac.zip dist/FFmpeg-GUI-Media-Converter-windows-amd64.exe dist/FFmpeg-GUI-Media-Converter-macos-universal
+                 dist/MediaConverter-windows-amd64.exe dist/MediaConverter-macos-universal # old names, for copies before 1.3.0
+                 dist/checksums.txt)
           if [ -n "$NEW" ]; then
-            gh release create "$TAG" --target "$(git rev-parse HEAD)" --title "Media Converter $VERSION" --notes-file release-notes.md "${FILES[@]}"
+            gh release create "$TAG" --target "$(git rev-parse HEAD)" --title "FFmpeg GUI - Media Converter $VERSION" --notes-file release-notes.md "${FILES[@]}"
           else
             gh release upload "$TAG" "${FILES[@]}" --clobber
             # A release made on GitHub may have no title or notes yet.
@@ -99,7 +101,7 @@ jobs:
               gh release edit "$TAG" --notes-file release-notes.md
             fi
             if [ -z "$(gh release view "$TAG" --json name --jq .name)" ]; then
-              gh release edit "$TAG" --title "Media Converter $VERSION"
+              gh release edit "$TAG" --title "FFmpeg GUI - Media Converter $VERSION"
             fi
           fi
-          echo "Published $TAG. Installed copies will offer Media Converter $VERSION the next time they open."
+          echo "Published $TAG. Installed copies will offer $VERSION the next time they open."

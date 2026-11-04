@@ -24,12 +24,15 @@ import (
 	"time"
 )
 
-// Where new versions of Media Converter are published.
-const updateRepo = "EDDEVELOPED/media-converter"
+// Where new versions are published. GitHub forwards the old address
+// (EDDEVELOPED/media-converter) here, which copies before 1.3.0 still use.
+const updateRepo = "EDDEVELOPED/ffmpeg-gui"
 
 // ---------- HTTP ----------
 
-func userAgent() string { return "MediaConverter/" + appVersion + " (" + runtime.GOOS + ")" }
+func userAgent() string {
+	return "FFmpeg-GUI-Media-Converter/" + appVersion + " (" + runtime.GOOS + ")"
+}
 
 var smallClient = &http.Client{Timeout: 20 * time.Second}
 
@@ -592,11 +595,11 @@ type UpdateProgress struct {
 func platformAsset() string {
 	switch runtime.GOOS {
 	case "windows":
-		return "MediaConverter-windows-amd64.exe"
+		return "FFmpeg-GUI-Media-Converter-windows-amd64.exe"
 	case "darwin":
-		return "MediaConverter-macos-universal"
+		return "FFmpeg-GUI-Media-Converter-macos-universal"
 	default:
-		return "MediaConverter-" + runtime.GOOS + "-" + runtime.GOARCH
+		return "FFmpeg-GUI-Media-Converter-" + runtime.GOOS + "-" + runtime.GOARCH
 	}
 }
 
@@ -783,7 +786,7 @@ func (a *App) applyUpdate(u AppUpdate) error {
 		// A running .exe can be renamed but not overwritten.
 		if err := os.Rename(exe, old); err != nil {
 			os.Remove(newPath)
-			return errors.New("Couldn't replace the app. Move Media Converter.exe to a folder you own, like your Desktop, and try again.")
+			return errors.New("Couldn't replace the app. Move " + filepath.Base(exe) + " to a folder you own, like your Desktop, and try again.")
 		}
 		if err := os.Rename(newPath, exe); err != nil {
 			_ = os.Rename(old, exe)

@@ -1,4 +1,4 @@
-"""Drive the Media Converter API end to end and check every output with ffprobe."""
+"""Drive the app's API end to end and check every output with ffprobe."""
 import json, os, shutil, subprocess, sys, time, urllib.request
 
 BIN = sys.argv[1]

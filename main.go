@@ -19,8 +19,12 @@ import (
 )
 
 const (
-	appName       = "Media Converter"
+	appName       = "FFmpeg GUI - Media Converter"
 	preferredPort = 47391
+	// Settings folder. Changing it means people lose their settings and the
+	// FFmpeg the app installed, unless the old folder is moved like below.
+	configFolder    = "FFmpeg GUI - Media Converter"
+	oldConfigFolder = "MediaConverter" // before 1.3.0, when the app was called Media Converter
 )
 
 // appVersion is set by build.sh from the VERSION file. Builds made without
@@ -32,9 +36,12 @@ func main() {
 		fmt.Println(appVersion)
 		return
 	}
-	cfgDir := configDir()
+	cfgDir, movedFrom := configDir()
 	_ = os.MkdirAll(cfgDir, 0o755)
 	setupLog(cfgDir)
+	if movedFrom != "" {
+		log.Printf("moved settings from %s to %s", movedFrom, cfgDir)
+	}
 
 	// Files passed on the command line: "Open with", or dropped on the app's icon.
 	var openFiles []string
@@ -135,15 +142,65 @@ func main() {
 	}
 }
 
-func configDir() string {
+// configDir is where settings, the log and the FFmpeg the app installs are
+// kept. The folder from before the rename is moved to the new name the first
+// time it isn't in use; movedFrom is set when that just happened.
+func configDir() (dir, movedFrom string) {
 	if d := os.Getenv("MC_CONFIG_DIR"); d != "" {
-		return d
+		return d, ""
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		base = os.TempDir()
 	}
-	return filepath.Join(base, "MediaConverter")
+	dir = filepath.Join(base, configFolder)
+	old := filepath.Join(base, oldConfigFolder)
+	if _, err := os.Stat(dir); err == nil {
+		return dir, ""
+	}
+	if st, err := os.Stat(old); err != nil || !st.IsDir() {
+		return dir, ""
+	}
+	// Right after an update the old version may still be closing, and Windows
+	// can't rename a folder while a file in it is open, so wait for it.
+	tries := 1
+	if os.Getenv("MC_RESTART_ADDR") != "" {
+		tries = 40
+	}
+	for i := 1; ; i++ {
+		if err := os.Rename(old, dir); err == nil {
+			fixMovedFFmpegPath(old, dir)
+			return dir, old
+		}
+		if i >= tries {
+			// Still in use, for example by an older copy that's open. Keep
+			// using it as it is; it's moved on a later start.
+			return old, ""
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+// fixMovedFFmpegPath points a saved FFmpeg location that was inside the old
+// settings folder (the copy the Install button put there) at the new folder.
+func fixMovedFFmpegPath(old, dir string) {
+	p := filepath.Join(dir, "settings.json")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return
+	}
+	s := defaultSettings()
+	if json.Unmarshal(data, &s) != nil || s.FFmpegPath == "" {
+		return
+	}
+	rel, err := filepath.Rel(old, s.FFmpegPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return
+	}
+	s.FFmpegPath = filepath.Join(dir, rel)
+	if out, err := json.MarshalIndent(s, "", "  "); err == nil {
+		_ = os.WriteFile(p, out, 0o644)
+	}
 }
 
 func setupLog(dir string) {

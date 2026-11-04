@@ -51,7 +51,7 @@ const (
 	asfwAny        = 0xFFFFFFFF
 	hwndTopmost    = ^uintptr(0) // (HWND)-1
 	hwndNoTopmost  = ^uintptr(1) // (HWND)-2
-	appWindowTitle = "Media Converter"
+	appWindowTitle = appName     // the page title, which the browser uses for the window
 )
 
 type winInfo struct {
@@ -155,7 +155,7 @@ func isAppWindow(w winInfo) bool {
 	return strings.HasPrefix(w.class, "Chrome_WidgetWin") || w.class == "MozillaWindowClass"
 }
 
-// focusAppWindow brings an open Media Converter window to the front.
+// focusAppWindow brings an open app window to the front.
 func focusAppWindow() bool { return waitAndFocus(isAppWindow, 0) }
 
 func appWindows() map[uintptr]bool {

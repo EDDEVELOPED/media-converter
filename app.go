@@ -121,7 +121,7 @@ func newApp(cfgDir, token, addr string) *App {
 		quit:     make(chan struct{}),
 	}
 	a.loadSettings()
-	if d, err := os.MkdirTemp("", "mediaconverter-"); err == nil {
+	if d, err := os.MkdirTemp("", "ffmpeg-gui-"); err == nil {
 		a.uploadDir = d
 	}
 	a.checking = true

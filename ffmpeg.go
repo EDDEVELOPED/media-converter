@@ -136,7 +136,7 @@ func detectFFmpeg(manual, managed string) FFInfo {
 			filepath.Join(dir, "ffmpeg", "bin", name),
 		)
 		if runtime.GOOS == "darwin" {
-			// Inside Media Converter.app/Contents/MacOS, also look in Resources
+			// Inside the .app's Contents/MacOS, also look in Resources
 			// and in the folder that holds the .app.
 			local = append(local,
 				filepath.Join(dir, "..", "Resources", name),
